@@ -36,3 +36,6 @@ jobs:
 
       - name: Run tests
         run: pytest || test $? -eq 5
+
+      - name: Build Docker image
+        run: docker build -t ai-whatsapp-assistant .
