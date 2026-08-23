@@ -34,8 +34,8 @@ jobs:
       - name: Run Django system check
         run: python manage.py check
 
-      - name: Run tests
-        run: pytest || test $? -eq 5
+      - name: Run tests with coverage
+        run: pytest --cov=. --cov-report=term-missing --cov-fail-under=60
 
       - name: Build Docker image
         run: docker build -t ai-whatsapp-assistant .
