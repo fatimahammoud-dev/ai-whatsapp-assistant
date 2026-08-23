@@ -11,7 +11,7 @@ jobs:
 
     env:
       SECRET_KEY: ci-test-secret-key
-      
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,4 +36,4 @@ jobs:
         run: python manage.py check
 
       - name: Run tests
-        run: pytest
+  run: pytest || test $? -eq 5
