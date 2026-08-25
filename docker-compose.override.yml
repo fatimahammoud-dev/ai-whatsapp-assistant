@@ -5,3 +5,11 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
     command: python manage.py runserver 0.0.0.0:8000
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
