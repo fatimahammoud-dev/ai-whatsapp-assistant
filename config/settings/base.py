@@ -45,10 +45,12 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "core.apps.CoreConfig",
     "tenants.apps.TenantsConfig",
+    "accounts.apps.AccountsConfig",
     "conversations.apps.ConversationsConfig",
     "bookings.apps.BookingsConfig",
     "integrations.apps.IntegrationsConfig",
 ]
+AUTH_USER_MODEL = "accounts.StaffUser"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
