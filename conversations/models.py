@@ -21,9 +21,3 @@ class EndUser(models.Model):
                 name="unique_enduser_tenant_phone",
             )
         ]
-        indexes = [
-            models.Index(
-                fields=["tenant", "phone_number"],
-                name="enduser_tenant_phone_idx",
-            )
-        ]
