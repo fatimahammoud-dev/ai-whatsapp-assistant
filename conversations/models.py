@@ -93,8 +93,4 @@ class Message(models.Model):
                 fields=["conversation", "created_at"],
                 name="message_conv_created_idx",
             ),
-            models.Index(
-                fields=["whatsapp_message_id"],
-                name="message_wa_id_idx",
-            ),
         ]
