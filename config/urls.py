@@ -7,6 +7,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from accounts.views import dashboard_home
+from bookings.views import BookingListView
 from core.views import healthcheck
 
 urlpatterns = [
@@ -28,5 +29,10 @@ urlpatterns = [
         "dashboard/",
         dashboard_home,
         name="dashboard",
+    ),
+    path(
+        "bookings/",
+        BookingListView.as_view(),
+        name="booking-list",
     ),
 ]
