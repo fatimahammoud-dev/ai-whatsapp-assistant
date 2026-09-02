@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from bookings.models import Booking
+from bookings.models import BlockedDate, Booking
 from conversations.models import EndUser
 from tenants.models import Tenant
 
@@ -95,3 +95,25 @@ def test_booking_end_must_be_after_start():
 
     with pytest.raises(ValidationError):
         booking.clean()
+
+
+@pytest.mark.django_db
+def test_blocked_date_is_unique_per_tenant():
+    tenant = Tenant.objects.create(
+        business_name="Test Clinic",
+        vertical="doctor",
+    )
+
+    blocked_date = timezone.now().date()
+
+    BlockedDate.objects.create(
+        tenant=tenant,
+        date=blocked_date,
+    )
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            BlockedDate.objects.create(
+                tenant=tenant,
+                date=blocked_date,
+            )
