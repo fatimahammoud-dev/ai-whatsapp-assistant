@@ -38,7 +38,7 @@ def test_staff_user_only_sees_own_tenant_bookings(client):
         scheduled_start=start,
         scheduled_end=start + timedelta(minutes=30),
     )
-    Booking.objects.create(
+    booking_b = Booking.objects.create(
         tenant=tenant_b,
         end_user=end_user_b,
         scheduled_start=start,
@@ -46,19 +46,34 @@ def test_staff_user_only_sees_own_tenant_bookings(client):
     )
 
     user_model = get_user_model()
-    staff_user = user_model.objects.create_user(
+
+    staff_a = user_model.objects.create_user(
         username="staff_a",
         password="test-password-123",
         tenant=tenant_a,
         role="staff",
     )
 
-    client.force_login(staff_user)
+    user_model.objects.create_user(
+        username="staff_b",
+        password="test-password-123",
+        tenant=tenant_b,
+        role="staff",
+    )
+
+    client.force_login(staff_a)
 
     response = client.get(reverse("booking-list"))
 
     assert response.status_code == 200
-    assert list(response.context["bookings"]) == [booking_a]
+
+    bookings = list(response.context["bookings"])
+
+    assert booking_a in bookings
+    assert booking_b not in bookings
+
+    assert b"Clinic A" in response.content
+    assert b"Clinic B" not in response.content
 
 
 @pytest.mark.django_db
@@ -97,6 +112,7 @@ def test_platform_admin_can_see_all_tenant_bookings(client):
     )
 
     user_model = get_user_model()
+
     platform_admin = user_model.objects.create_user(
         username="platform_admin",
         password="test-password-123",
@@ -108,7 +124,11 @@ def test_platform_admin_can_see_all_tenant_bookings(client):
     response = client.get(reverse("booking-list"))
 
     assert response.status_code == 200
-    assert set(response.context["bookings"]) == {
-        booking_a,
-        booking_b,
-    }
+
+    bookings = list(response.context["bookings"])
+
+    assert booking_a in bookings
+    assert booking_b in bookings
+
+    assert b"Clinic A" in response.content
+    assert b"Clinic B" in response.content
