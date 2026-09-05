@@ -6,3 +6,5 @@ db.sqlite3
 .vscode/
 .coverage
 staticfiles
+.ruff_cache
+.pytest_cache
