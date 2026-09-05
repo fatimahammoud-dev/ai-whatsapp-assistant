@@ -1,8 +1,25 @@
 # Create your models here.
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import (
+    DateTimeRangeField,
+    RangeBoundary,
+    RangeOperators,
+)
 from django.core.exceptions import ValidationError
 from django.db import models
 
 from tenants.models import Tenant
+
+
+class TsTzRange(models.Func):
+    """The booking's time span as a half-open [start, end) tstzrange.
+
+    Half-open is what makes back-to-back bookings (10:00-10:30 and
+    10:30-11:00) legal while any real overlap is not.
+    """
+
+    function = "TSTZRANGE"
+    output_field = DateTimeRangeField()
 
 
 class Service(models.Model):
@@ -60,10 +77,20 @@ class Booking(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["tenant", "scheduled_start"],
+            ExclusionConstraint(
+                name="exclude_overlapping_confirmed_bookings",
+                expressions=[
+                    ("tenant", RangeOperators.EQUAL),
+                    (
+                        TsTzRange(
+                            "scheduled_start",
+                            "scheduled_end",
+                            RangeBoundary(),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ],
                 condition=models.Q(status="confirmed"),
-                name="unique_confirmed_booking_start_per_tenant",
             ),
             models.CheckConstraint(
                 condition=models.Q(scheduled_end__gt=models.F("scheduled_start")),

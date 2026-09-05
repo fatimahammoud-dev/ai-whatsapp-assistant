@@ -11,35 +11,111 @@ from conversations.models import EndUser
 from tenants.models import Tenant
 
 
-@pytest.mark.django_db
-def test_confirmed_booking_start_is_unique_per_tenant():
-    tenant = Tenant.objects.create(
+@pytest.fixture
+def tenant(db):
+    return Tenant.objects.create(
         business_name="Test Clinic",
         vertical="doctor",
     )
-    end_user = EndUser.objects.create(
-        tenant=tenant,
-        phone_number="+96170111111",
+
+
+@pytest.fixture
+def other_tenant(db):
+    return Tenant.objects.create(
+        business_name="Other Clinic",
+        vertical="doctor",
     )
 
-    start = timezone.now()
-    end = start + timedelta(minutes=30)
 
-    Booking.objects.create(
+@pytest.fixture
+def end_user(tenant):
+    return EndUser.objects.create(
+        tenant=tenant,
+        phone_number="+96170777777",
+    )
+
+
+@pytest.fixture
+def start():
+    return timezone.now().replace(microsecond=0)
+
+
+def make_booking(tenant, end_user, start, offset_minutes, duration_minutes, **kwargs):
+    return Booking.objects.create(
         tenant=tenant,
         end_user=end_user,
-        scheduled_start=start,
-        scheduled_end=end,
+        scheduled_start=start + timedelta(minutes=offset_minutes),
+        scheduled_end=start + timedelta(minutes=offset_minutes + duration_minutes),
+        **kwargs,
     )
+
+
+@pytest.mark.parametrize(
+    ("offset_minutes", "duration_minutes", "description"),
+    [
+        (0, 30, "exact duplicate"),
+        (1, 30, "starts one minute later"),
+        (15, 30, "overlaps the second half"),
+        (-10, 20, "overlaps from the left"),
+        (5, 15, "fully contained"),
+        (-15, 60, "fully contains the existing booking"),
+    ],
+)
+@pytest.mark.django_db
+def test_overlapping_confirmed_bookings_are_rejected(
+    tenant, end_user, start, offset_minutes, duration_minutes, description
+):
+    make_booking(tenant, end_user, start, 0, 30)
 
     with pytest.raises(IntegrityError):
         with transaction.atomic():
-            Booking.objects.create(
-                tenant=tenant,
-                end_user=end_user,
-                scheduled_start=start,
-                scheduled_end=end,
-            )
+            make_booking(tenant, end_user, start, offset_minutes, duration_minutes)
+
+
+@pytest.mark.django_db
+def test_back_to_back_bookings_are_allowed(tenant, end_user, start):
+    """The range is half-open, so 10:00-10:30 and 10:30-11:00 do not overlap."""
+    make_booking(tenant, end_user, start, 0, 30)
+
+    assert make_booking(tenant, end_user, start, 30, 30).pk is not None
+
+
+@pytest.mark.django_db
+def test_disjoint_bookings_are_allowed(tenant, end_user, start):
+    make_booking(tenant, end_user, start, 0, 30)
+
+    assert make_booking(tenant, end_user, start, 90, 30).pk is not None
+
+
+@pytest.mark.django_db
+def test_the_same_slot_is_allowed_for_a_different_tenant(
+    tenant, other_tenant, end_user, start
+):
+    make_booking(tenant, end_user, start, 0, 30)
+
+    other_end_user = EndUser.objects.create(
+        tenant=other_tenant,
+        phone_number="+96170888888",
+    )
+
+    assert make_booking(other_tenant, other_end_user, start, 0, 30).pk is not None
+
+
+@pytest.mark.django_db
+def test_a_cancelled_booking_does_not_block_the_slot(tenant, end_user, start):
+    make_booking(tenant, end_user, start, 0, 30, status=Booking.Status.CANCELLED)
+
+    assert make_booking(tenant, end_user, start, 0, 30).pk is not None
+
+
+@pytest.mark.django_db
+def test_cancelling_a_booking_frees_the_slot(tenant, end_user, start):
+    booking = make_booking(tenant, end_user, start, 0, 30)
+
+    booking.status = Booking.Status.CANCELLED
+    booking.save()
+
+    assert make_booking(tenant, end_user, start, 0, 30).pk is not None
 
 
 @pytest.mark.django_db
