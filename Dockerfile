@@ -24,6 +24,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 
+# SECRET_KEY is only needed to import settings here; it is not baked into the image.
+RUN SECRET_KEY=build-only-not-a-real-secret python manage.py collectstatic --noinput
+
 RUN chmod +x /app/entrypoint.sh \
     && chown -R appuser:appgroup /app /home/appuser
 
