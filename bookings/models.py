@@ -15,6 +15,9 @@ class Service(models.Model):
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.name
+
 
 class Booking(models.Model):
     class Status(models.TextChoices):
@@ -64,6 +67,9 @@ class Booking(models.Model):
             )
         ]
 
+    def __str__(self):
+        return f"Booking {self.pk} at {self.scheduled_start:%Y-%m-%d %H:%M}"
+
     def clean(self):
         super().clean()
 
@@ -92,3 +98,6 @@ class BlockedDate(models.Model):
                 name="unique_blocked_date_per_tenant",
             )
         ]
+
+    def __str__(self):
+        return f"Blocked {self.date}"

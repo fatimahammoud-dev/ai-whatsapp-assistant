@@ -21,6 +21,9 @@ class EndUser(models.Model):
             )
         ]
 
+    def __str__(self):
+        return self.display_name or self.phone_number
+
 
 class Conversation(models.Model):
     class Status(models.TextChoices):
@@ -51,6 +54,9 @@ class Conversation(models.Model):
     )
     started_at = models.DateTimeField(auto_now_add=True)
     last_message_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Conversation {self.pk} ({self.status})"
 
 
 class Message(models.Model):
@@ -94,3 +100,7 @@ class Message(models.Model):
                 name="message_conv_created_idx",
             ),
         ]
+
+    def __str__(self):
+        stamp = f"{self.created_at:%Y-%m-%d %H:%M}"
+        return f"{self.direction} {self.message_type} at {stamp}"
