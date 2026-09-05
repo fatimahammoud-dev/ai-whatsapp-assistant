@@ -117,3 +117,50 @@ def test_blocked_date_is_unique_per_tenant():
                 tenant=tenant,
                 date=blocked_date,
             )
+
+
+@pytest.mark.django_db
+def test_booking_end_before_start_is_rejected_by_the_database():
+    """clean() only runs through forms; direct saves must still be rejected."""
+    tenant = Tenant.objects.create(
+        business_name="Test Clinic",
+        vertical="doctor",
+    )
+    end_user = EndUser.objects.create(
+        tenant=tenant,
+        phone_number="+96170444444",
+    )
+
+    start = timezone.now()
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Booking.objects.create(
+                tenant=tenant,
+                end_user=end_user,
+                scheduled_start=start,
+                scheduled_end=start - timedelta(minutes=30),
+            )
+
+
+@pytest.mark.django_db
+def test_booking_with_equal_start_and_end_is_rejected_by_the_database():
+    tenant = Tenant.objects.create(
+        business_name="Test Clinic",
+        vertical="doctor",
+    )
+    end_user = EndUser.objects.create(
+        tenant=tenant,
+        phone_number="+96170555555",
+    )
+
+    start = timezone.now()
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Booking.objects.create(
+                tenant=tenant,
+                end_user=end_user,
+                scheduled_start=start,
+                scheduled_end=start,
+            )

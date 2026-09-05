@@ -64,7 +64,11 @@ class Booking(models.Model):
                 fields=["tenant", "scheduled_start"],
                 condition=models.Q(status="confirmed"),
                 name="unique_confirmed_booking_start_per_tenant",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(scheduled_end__gt=models.F("scheduled_start")),
+                name="booking_end_after_start",
+            ),
         ]
 
     def __str__(self):
