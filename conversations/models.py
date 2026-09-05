@@ -83,8 +83,9 @@ class Message(models.Model):
         choices=MessageType.choices,
     )
     content = models.TextField(blank=True)
-    media_reference = models.CharField(blank=True)
+    media_reference = models.CharField(max_length=255, blank=True)
     whatsapp_message_id = models.CharField(
+        max_length=255,
         unique=True,
         null=True,
         blank=True,
