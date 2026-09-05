@@ -13,16 +13,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system appgroup \
+    && adduser --system --ingroup appgroup --home /home/appuser --shell /usr/sbin/nologin appuser
 
 COPY --from=builder /install /usr/local
 COPY . .
 
+ENV HOME=/home/appuser
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 
-RUN chown -R appuser:appgroup /app
+RUN chown -R appuser:appgroup /app /home/appuser
 
 USER appuser
 
