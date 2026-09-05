@@ -1,4 +1,5 @@
 asgiref==3.12.1
+cryptography==46.0.3
 Django==6.1
 django-environ==0.14.0
 gunicorn==26.2.0

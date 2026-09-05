@@ -1,6 +1,8 @@
 # Create your models here.
 from django.db import models
 
+from core.fields import EncryptedBinaryField
+
 
 class Tenant(models.Model):
     class Vertical(models.TextChoices):
@@ -29,7 +31,7 @@ class Tenant(models.Model):
         blank=True,
         unique=True,
     )
-    whatsapp_access_token = models.BinaryField(null=True, blank=True)
+    whatsapp_access_token = EncryptedBinaryField(null=True, blank=True)
     whatsapp_connected_at = models.DateTimeField(null=True, blank=True)
 
     calendar_provider = models.CharField(

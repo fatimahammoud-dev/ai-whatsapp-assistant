@@ -26,6 +26,11 @@ environ.Env.read_env(BASE_DIR / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
 
+# Fernet key protecting stored third-party credentials. Generate with:
+#   python -c 'from cryptography.fernet import Fernet;
+#              print(Fernet.generate_key().decode())'
+TOKEN_ENCRYPTION_KEY = env("TOKEN_ENCRYPTION_KEY", default="")
+
 # SECURITY WARNING: don't run with debug turned on in production!
 
 

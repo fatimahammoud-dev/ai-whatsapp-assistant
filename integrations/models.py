@@ -1,6 +1,7 @@
 # Create your models here.
 from django.db import models
 
+from core.fields import EncryptedBinaryField
 from tenants.models import Tenant
 
 
@@ -14,8 +15,8 @@ class CalendarConnection(models.Model):
         choices=Tenant.CalendarProvider.choices,
     )
     external_calendar_id = models.CharField(max_length=255)
-    access_token = models.BinaryField()
-    refresh_token = models.BinaryField()
+    access_token = EncryptedBinaryField()
+    refresh_token = EncryptedBinaryField()
     token_expires_at = models.DateTimeField()
     scopes = models.JSONField(default=list)
     connected_at = models.DateTimeField(auto_now_add=True)
