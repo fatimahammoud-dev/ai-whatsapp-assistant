@@ -76,6 +76,7 @@ class Booking(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering = ["scheduled_start", "pk"]
         constraints = [
             ExclusionConstraint(
                 name="exclude_overlapping_confirmed_bookings",

@@ -10,3 +10,4 @@ class BookingListView(LoginRequiredMixin, TenantScopedMixin, ListView):
     model = Booking
     template_name = "bookings/booking_list.html"
     context_object_name = "bookings"
+    paginate_by = 50
