@@ -3,6 +3,11 @@ name: CI
 on:
   pull_request:
 
+env:
+  # Long enough and random enough to satisfy check --deploy (security.W009).
+  SECRET_KEY: ci-secret-key-8f2a41b7c93de506af1b2c8d47e9350bd6a1f4c72e8b90d3
+  TOKEN_ENCRYPTION_KEY: yYGHG63G5CjsTYdyAOwGu0n2FvlLKjmjtntUbJZ8Q9w=
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -30,8 +35,27 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # The schema relies on Postgres-only features (a GiST exclusion
+    # constraint, btree_gist, pg_indexes). Without a real Postgres the suite
+    # silently fell back to SQLite and could not exercise them.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ai_whatsapp_assistant
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      SECRET_KEY: ci-test-secret-key
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_whatsapp_assistant
+      ALLOWED_HOSTS: localhost,127.0.0.1
 
     steps:
       - name: Checkout repository
@@ -50,15 +74,77 @@ jobs:
       - name: Run Django system check
         run: python manage.py check
 
+      - name: Run deployment check
+        # --fail-level WARNING so a missing security setting fails the build
+        # rather than scrolling past.
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Check for unapplied model changes
+        run: python manage.py makemigrations --check --dry-run
+
       - name: Run tests with coverage
         run: pytest --cov=. --cov-report=term-missing --cov-fail-under=60
 
-  docker:
+  smoke:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t ai-whatsapp-assistant .
+      - name: Write .env for the compose stack
+        run: |
+          cat > .env <<'EOF'
+          SECRET_KEY=ci-secret-key-8f2a41b7c93de506af1b2c8d47e9350bd6a1f4c72e8b90d3
+          TOKEN_ENCRYPTION_KEY=yYGHG63G5CjsTYdyAOwGu0n2FvlLKjmjtntUbJZ8Q9w=
+          ALLOWED_HOSTS=localhost,127.0.0.1
+          POSTGRES_DB=ai_whatsapp_assistant
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_whatsapp_assistant
+          REDIS_URL=redis://redis:6379/0
+          DJANGO_SETTINGS_MODULE=config.settings.prod
+          SECURE_SSL_REDIRECT=False
+          EOF
+
+      - name: Start the production stack
+        # -f docker-compose.yml only: the override is the dev configuration.
+        run: docker compose -f docker-compose.yml up -d --build
+
+      - name: Wait for the app to answer
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health/ > /dev/null; then
+              echo "app is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "app did not become healthy"
+          docker compose -f docker-compose.yml logs app
+          exit 1
+
+      - name: Migrations ran on start
+        run: |
+          docker compose -f docker-compose.yml exec -T app \
+            python manage.py migrate --check
+
+      - name: Static files are served
+        run: curl -fsS -o /dev/null http://localhost:8000/static/admin/css/base.css
+
+      - name: The site root redirects
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/)" = "302"
+
+      - name: No errors in the application log
+        run: |
+          if docker compose -f docker-compose.yml logs app | grep -E "\[ERROR\]|Traceback"; then
+            echo "found errors in the app log"
+            exit 1
+          fi
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f docker-compose.yml down -v
