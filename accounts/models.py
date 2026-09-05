@@ -12,7 +12,7 @@ class StaffUser(AbstractUser):
 
     tenant = models.ForeignKey(
         Tenant,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

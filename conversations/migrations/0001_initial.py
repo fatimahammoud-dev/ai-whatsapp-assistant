@@ -37,12 +37,6 @@ class Migration(migrations.Migration):
                 ),
             ],
             options={
-                "indexes": [
-                    models.Index(
-                        fields=["tenant", "phone_number"],
-                        name="enduser_tenant_phone_idx",
-                    )
-                ],
                 "constraints": [
                     models.UniqueConstraint(
                         fields=("tenant", "phone_number"),

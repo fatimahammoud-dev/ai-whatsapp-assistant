@@ -20,12 +20,6 @@ class EndUser(models.Model):
                 name="unique_enduser_tenant_phone",
             )
         ]
-        indexes = [
-            models.Index(
-                fields=["tenant", "phone_number"],
-                name="enduser_tenant_phone_idx",
-            )
-        ]
 
 
 class Conversation(models.Model):
@@ -98,9 +92,5 @@ class Message(models.Model):
             models.Index(
                 fields=["conversation", "created_at"],
                 name="message_conv_created_idx",
-            ),
-            models.Index(
-                fields=["whatsapp_message_id"],
-                name="message_wa_id_idx",
             ),
         ]

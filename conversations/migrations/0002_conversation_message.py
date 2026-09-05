@@ -81,7 +81,10 @@ class Migration(migrations.Migration):
                 (
                     "direction",
                     models.CharField(
-                        choices=[("inbound", "Inbound"), ("outbound", "Outbound")],
+                        choices=[
+                            ("inbound", "Inbound"),
+                            ("outbound", "Outbound"),
+                        ],
                         max_length=8,
                     ),
                 ),
@@ -101,7 +104,11 @@ class Migration(migrations.Migration):
                 ("media_reference", models.CharField(blank=True)),
                 (
                     "whatsapp_message_id",
-                    models.CharField(blank=True, null=True, unique=True),
+                    models.CharField(
+                        blank=True,
+                        null=True,
+                        unique=True,
+                    ),
                 ),
                 ("raw_payload", models.JSONField(default=dict)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -119,9 +126,6 @@ class Migration(migrations.Migration):
                     models.Index(
                         fields=["conversation", "created_at"],
                         name="message_conv_created_idx",
-                    ),
-                    models.Index(
-                        fields=["whatsapp_message_id"], name="message_wa_id_idx"
                     ),
                 ],
             },
