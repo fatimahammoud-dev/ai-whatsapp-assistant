@@ -18,8 +18,13 @@ def _signature_for(body):
 
 
 @override_settings(META_APP_SECRET=APP_SECRET)
-def test_whatsapp_webhook_accepts_valid_signature(client):
+def test_whatsapp_webhook_accepts_valid_signature(client, monkeypatch):
     body = b'{"object":"whatsapp_business_account"}'
+
+    monkeypatch.setattr(
+        "integrations.views._resolve_whatsapp_context",
+        lambda payload: object(),
+    )
 
     response = client.generic(
         "POST",
@@ -78,15 +83,23 @@ def test_whatsapp_webhook_signature_uses_raw_request_body(client):
 
 
 @override_settings(META_APP_SECRET=APP_SECRET)
-def test_signature_verification_happens_before_json_parsing(client):
-    body = b"this-is-not-valid-json"
+def test_signature_verification_happens_before_json_parsing(client, monkeypatch):
+    body = b"not-valid-json"
+
+    def fail_if_parsing_happens(*args, **kwargs):
+        raise AssertionError("Payload parsing happened before signature verification")
+
+    monkeypatch.setattr(
+        "integrations.views.json.loads",
+        fail_if_parsing_happens,
+    )
 
     response = client.generic(
         "POST",
         reverse("whatsapp-webhook"),
         data=body,
         content_type="application/json",
-        HTTP_X_HUB_SIGNATURE_256=_signature_for(body),
+        HTTP_X_HUB_SIGNATURE_256="sha256=invalid",
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 403
