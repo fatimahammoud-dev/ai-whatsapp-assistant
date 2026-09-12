@@ -164,6 +164,8 @@ def whatsapp_webhook(request):
             resolved_context,
         )
 
+        logger.info("Inbound WhatsApp message persisted; processing would happen here.")
+
         return HttpResponse(status=200)
 
     return HttpResponseNotAllowed(["GET", "POST"])
