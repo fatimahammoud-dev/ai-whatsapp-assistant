@@ -10,6 +10,7 @@ from django.views.generic import RedirectView
 from accounts.views import dashboard_home
 from bookings.views import BookingListView
 from core.views import healthcheck
+from integrations.views import whatsapp_webhook
 
 urlpatterns = [
     path(
@@ -19,6 +20,7 @@ urlpatterns = [
     ),
     path("admin/", admin.site.urls),
     path("health/", healthcheck, name="healthcheck"),
+    path("webhook/whatsapp/", whatsapp_webhook, name="whatsapp-webhook"),
     path(
         "login/",
         auth_views.LoginView.as_view(

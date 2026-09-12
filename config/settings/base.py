@@ -31,6 +31,12 @@ SECRET_KEY = env("SECRET_KEY")
 #              print(Fernet.generate_key().decode())'
 TOKEN_ENCRYPTION_KEY = env("TOKEN_ENCRYPTION_KEY", default="")
 
+# Token used by Meta to verify the WhatsApp webhook callback URL.
+WHATSAPP_VERIFY_TOKEN = env("WHATSAPP_VERIFY_TOKEN", default="")
+
+# Meta App Secret used to verify WhatsApp webhook signatures.
+META_APP_SECRET = env("META_APP_SECRET", default="")
+
 # SECURITY WARNING: don't run with debug turned on in production!
 
 
