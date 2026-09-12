@@ -61,8 +61,7 @@ class Migration(migrations.Migration):
                 (
                     "tenant",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE,
-                        to="tenants.tenant",
+                        on_delete=django.db.models.deletion.CASCADE, to="tenants.tenant"
                     ),
                 ),
             ],

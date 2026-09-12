@@ -3,10 +3,15 @@ services:
     build:
       args:
         REQUIREMENTS_FILE: requirements-dev.txt
+    # Run as the host user so files written into the bind mount (migrations,
+    # tool caches) stay owned by the developer instead of root.
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
     volumes:
       - .:/app
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.dev
+      # /home/appuser belongs to the image's appuser, not the host uid.
+      HOME: /tmp
     command: python manage.py runserver 0.0.0.0:8000
 
   db:
