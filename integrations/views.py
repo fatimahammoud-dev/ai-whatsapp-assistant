@@ -13,7 +13,7 @@ from django.http import (
 )
 from django.views.decorators.csrf import csrf_exempt
 
-from conversations.models import Conversation, EndUser
+from conversations.models import Conversation, EndUser, Message
 from tenants.models import Tenant
 
 logger = logging.getLogger(__name__)
@@ -45,10 +45,20 @@ def _extract_whatsapp_message(payload):
     value = payload["entry"][0]["changes"][0]["value"]
     message = value["messages"][0]
 
+    message_type = message["type"]
+
+    if message_type == "text":
+        content = message.get("text", {}).get("body", "")
+    else:
+        # Audio/image transcription or description is handled later.
+        content = ""
+
     return {
         "phone_number_id": value["metadata"]["phone_number_id"],
         "sender_phone_number": message["from"],
-        "message_content": message.get("text", {}).get("body", ""),
+        "message_content": content,
+        "message_type": message_type,
+        "whatsapp_message_id": message["id"],
     }
 
 
@@ -96,6 +106,21 @@ def _resolve_whatsapp_context(payload):
     }
 
 
+def _persist_inbound_message(payload, resolved_context):
+    message_data = _extract_whatsapp_message(payload)
+
+    return Message.objects.get_or_create(
+        whatsapp_message_id=message_data["whatsapp_message_id"],
+        defaults={
+            "conversation": resolved_context["conversation"],
+            "direction": Message.Direction.INBOUND,
+            "message_type": message_data["message_type"],
+            "content": message_data["message_content"],
+            "raw_payload": payload,
+        },
+    )
+
+
 @csrf_exempt
 def whatsapp_webhook(request):
     if request.method == "GET":
@@ -115,7 +140,7 @@ def whatsapp_webhook(request):
         return HttpResponseForbidden()
 
     if request.method == "POST":
-        # Ticket 5: signature verification MUST happen before parsing.
+        # Ticket 5: signature verification happens before parsing.
         if not _has_valid_whatsapp_signature(request):
             return HttpResponseForbidden()
 
@@ -133,6 +158,11 @@ def whatsapp_webhook(request):
 
         if resolved_context is None:
             return HttpResponse(status=404)
+
+        _persist_inbound_message(
+            payload,
+            resolved_context,
+        )
 
         return HttpResponse(status=200)
 

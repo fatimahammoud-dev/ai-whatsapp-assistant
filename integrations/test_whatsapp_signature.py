@@ -25,6 +25,10 @@ def test_whatsapp_webhook_accepts_valid_signature(client, monkeypatch):
         "integrations.views._resolve_whatsapp_context",
         lambda payload: object(),
     )
+    monkeypatch.setattr(
+        "integrations.views._persist_inbound_message",
+        lambda payload, resolved_context: (None, True),
+    )
 
     response = client.generic(
         "POST",
