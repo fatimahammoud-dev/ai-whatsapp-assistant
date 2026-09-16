@@ -14,6 +14,7 @@ from django.http import (
 from django.views.decorators.csrf import csrf_exempt
 
 from conversations.models import Conversation, EndUser, Message
+from integrations.tasks import buffer_inbound_message
 from tenants.models import Tenant
 
 logger = logging.getLogger(__name__)
@@ -159,12 +160,17 @@ def whatsapp_webhook(request):
         if resolved_context is None:
             return HttpResponse(status=404)
 
-        _persist_inbound_message(
+        message, created = _persist_inbound_message(
             payload,
             resolved_context,
         )
 
-        logger.info("Inbound WhatsApp message persisted; processing would happen here.")
+        if created:
+            buffer_inbound_message(
+                resolved_context["tenant"].pk,
+                resolved_context["end_user"].pk,
+                message.content,
+            )
 
         return HttpResponse(status=200)
 
