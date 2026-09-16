@@ -18,6 +18,20 @@ services:
       redis:
         condition: service_healthy
 
+  celery:
+    build:
+      context: .
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A config worker --loglevel=info
+
   db:
     image: postgres:17-alpine
     env_file:
