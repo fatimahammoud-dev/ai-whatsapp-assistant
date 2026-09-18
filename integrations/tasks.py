@@ -8,6 +8,7 @@ from redis import Redis
 
 from conversations.models import Conversation
 from integrations.agent.mock import MockAgent
+from integrations.tools.dispatcher import dispatch_tool
 from integrations.whatsapp import send_text_message
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,30 @@ def process_buffered_messages(
             response.tool,
             tenant_id,
             end_user_id,
+        )
+
+        tool_args = dict(response.tool_args)
+
+        if response.tool == "check_availability":
+            tool_args.setdefault("tenant", conversation.tenant)
+            tool_args.setdefault("date_range", None)
+
+        result = dispatch_tool(
+            response.tool,
+            **tool_args,
+        )
+
+        if response.tool == "check_availability":
+            reply_text = "Available appointment times: " + ", ".join(
+                slot.start.strftime("%Y-%m-%d %H:%M") for slot in result
+            )
+        else:
+            reply_text = str(result)
+
+        send_text_message(
+            conversation.tenant,
+            conversation.end_user.phone_number,
+            reply_text,
         )
 
 

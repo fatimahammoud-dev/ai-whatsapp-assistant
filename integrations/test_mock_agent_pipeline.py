@@ -102,7 +102,15 @@ def test_process_buffered_messages_recognizes_tool_call(monkeypatch):
     )
 
     respond_mock.assert_called_once()
-    send_mock.assert_not_called()
+
+    send_mock.assert_called_once_with(
+        conversation.tenant,
+        "96170123456",
+        "Available appointment times: "
+        "2026-01-15 09:00, "
+        "2026-01-15 11:00, "
+        "2026-01-15 14:00",
+    )
 
 
 def test_process_buffered_messages_stops_without_active_conversation(
