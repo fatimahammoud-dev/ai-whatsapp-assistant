@@ -25,6 +25,7 @@ services:
       - .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
+      RUN_MIGRATIONS: "false"
     depends_on:
       db:
         condition: service_healthy
