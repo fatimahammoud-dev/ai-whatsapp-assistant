@@ -1,9 +1,14 @@
 import logging
 import time
+from types import SimpleNamespace
 
 from celery import shared_task
 from django.conf import settings
 from redis import Redis
+
+from conversations.models import Conversation
+from integrations.agent.mock import MockAgent
+from integrations.whatsapp import send_text_message
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +50,53 @@ def process_buffered_messages(
     end_user_id,
     concatenated_messages,
 ):
-    """Current processing stub, to be replaced by the real pipeline later."""
-    logger.info(
-        "Buffered WhatsApp messages ready for processing "
-        "tenant_id=%s end_user_id=%s",
-        tenant_id,
-        end_user_id,
+    """Process one drained message batch through the conversational agent."""
+    conversation = (
+        Conversation.objects.select_related("tenant", "end_user")
+        .filter(
+            tenant_id=tenant_id,
+            end_user_id=end_user_id,
+            status=Conversation.Status.ACTIVE,
+        )
+        .order_by("-started_at")
+        .first()
     )
+
+    if conversation is None:
+        logger.error(
+            "Cannot process buffered messages: no active conversation "
+            "tenant_id=%s end_user_id=%s",
+            tenant_id,
+            end_user_id,
+        )
+        return
+
+    messages = [
+        SimpleNamespace(content=content)
+        for content in concatenated_messages.split("\n")
+        if content
+    ]
+
+    response = MockAgent().respond(
+        conversation=conversation,
+        messages=messages,
+    )
+
+    if response.action == "reply":
+        send_text_message(
+            conversation.tenant,
+            conversation.end_user.phone_number,
+            response.text,
+        )
+        return
+
+    if response.action == "tool_call":
+        logger.info(
+            "Agent requested tool call tool=%s tenant_id=%s end_user_id=%s",
+            response.tool,
+            tenant_id,
+            end_user_id,
+        )
 
 
 def buffer_inbound_message(
