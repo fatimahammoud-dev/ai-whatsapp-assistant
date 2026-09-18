@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 import json
-import logging
+from unittest.mock import patch
 
 import pytest
 from django.test import override_settings
@@ -79,21 +79,17 @@ def _signature_for(body):
 
 @pytest.mark.django_db
 @override_settings(META_APP_SECRET=APP_SECRET)
-def test_webhook_persists_message_logs_processing_stub_and_returns_200(
+def test_webhook_persists_message_buffers_processing_and_returns_200(
     client,
     tenant,
     inbound_payload,
-    caplog,
 ):
     body = json.dumps(
         inbound_payload,
         separators=(",", ":"),
     ).encode("utf-8")
 
-    with caplog.at_level(
-        logging.INFO,
-        logger="integrations.views",
-    ):
+    with patch("integrations.views.buffer_inbound_message") as buffer_mock:
         response = client.generic(
             "POST",
             reverse("whatsapp-webhook"),
@@ -112,7 +108,8 @@ def test_webhook_persists_message_logs_processing_stub_and_returns_200(
     assert message.direction == Message.Direction.INBOUND
     assert message.content == "Hello from Ticket 8"
 
-    assert (
-        "Inbound WhatsApp message persisted; processing would happen here."
-        in caplog.text
+    buffer_mock.assert_called_once_with(
+        tenant.pk,
+        message.conversation.end_user_id,
+        "Hello from Ticket 8",
     )
