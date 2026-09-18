@@ -2,6 +2,11 @@ from .base import *
 
 DEBUG = True
 
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1"],
+)
+
 # WhiteNoise serves the collectstatic output, which only exists in the built
 # image. runserver serves static files itself while DEBUG is True, so drop the
 # middleware here to avoid a "No directory at: .../staticfiles/" warning.
