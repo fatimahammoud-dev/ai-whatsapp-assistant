@@ -201,3 +201,8 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+
+# Celery / Redis
+REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
+CELERY_BROKER_URL = REDIS_URL
