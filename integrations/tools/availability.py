@@ -4,7 +4,17 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from django.utils import timezone
+
 from bookings.models import BlockedDate, Booking
+
+DEFAULT_WORKING_HOURS = {
+    "mon": ["09:00", "17:00"],
+    "tue": ["09:00", "17:00"],
+    "wed": ["09:00", "17:00"],
+    "thu": ["09:00", "17:00"],
+    "fri": ["09:00", "17:00"],
+}
 
 
 @dataclass(frozen=True)
@@ -101,6 +111,7 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
     )
 
     available_slots = []
+    working_hours = tenant.working_hours or DEFAULT_WORKING_HOURS
     current_date = first_date
 
     while current_date <= last_date:
@@ -108,7 +119,7 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
             current_date += timedelta(days=1)
             continue
 
-        hours = _working_hours_for_date(tenant.working_hours, current_date)
+        hours = _working_hours_for_date(working_hours, current_date)
 
         if not hours or len(hours) != 2:
             current_date += timedelta(days=1)
@@ -197,20 +208,36 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
 
 
 def check_availability(tenant, date_range) -> list[TimeSlot]:
-    """Return deterministic fake availability until Ticket 2 wires real logic."""
-    del tenant, date_range
+    """Return real computed availability for the tenant.
 
-    return [
-        TimeSlot(
-            start=datetime(2026, 1, 15, 9, 0),
-            end=datetime(2026, 1, 15, 9, 30),
-        ),
-        TimeSlot(
-            start=datetime(2026, 1, 15, 11, 0),
-            end=datetime(2026, 1, 15, 11, 30),
-        ),
-        TimeSlot(
-            start=datetime(2026, 1, 15, 14, 0),
-            end=datetime(2026, 1, 15, 14, 30),
-        ),
-    ]
+    When no range is supplied, use the next seven tenant-local calendar days.
+    A service is not selected by the mock agent yet, so the tenant's default
+    slot duration is used.
+    """
+    minimum_start = None
+
+    if date_range is None:
+        tenant_timezone = ZoneInfo(tenant.timezone)
+        minimum_start = timezone.now().astimezone(tenant_timezone)
+
+        range_start = datetime.combine(
+            minimum_start.date(),
+            time.min,
+            tzinfo=tenant_timezone,
+        )
+
+        date_range = TimeSlot(
+            start=range_start,
+            end=range_start + timedelta(days=7),
+        )
+
+    slots = compute_available_slots(
+        tenant=tenant,
+        service=None,
+        date_range=date_range,
+    )
+
+    if minimum_start is not None:
+        slots = [slot for slot in slots if slot.start >= minimum_start]
+
+    return slots
