@@ -9,6 +9,26 @@
 
     <p>Welcome, {{ request.user.username }}.</p>
 
+    <h2>Upcoming bookings</h2>
+
+    <ul>
+        {% for booking in upcoming_bookings %}
+            <li>
+                {{ booking.end_user }}
+                —
+                {% if booking.service %}
+                    {{ booking.service.name }}
+                {% else %}
+                    No service
+                {% endif %}
+                —
+                {{ booking.scheduled_start|date:"Y-m-d H:i" }}
+            </li>
+        {% empty %}
+            <li>No upcoming bookings.</li>
+        {% endfor %}
+    </ul>
+
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit">Log out</button>
