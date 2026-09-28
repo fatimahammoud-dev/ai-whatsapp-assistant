@@ -1,15 +1,13 @@
 from datetime import timedelta
 
 import pytest
+from django.db import IntegrityError
 from django.utils import timezone
 
 from bookings.models import Booking, Service
 from conversations.models import EndUser
 from integrations.tools.availability import TimeSlot
-from integrations.tools.booking import (
-    BookingSlotUnavailableError,
-    create_booking,
-)
+from integrations.tools.booking import SlotUnavailableError, create_booking
 from tenants.models import Tenant
 
 
@@ -58,7 +56,7 @@ def test_create_booking_creates_confirmed_booking(booking_data):
     assert booking.status == Booking.Status.CONFIRMED
 
 
-def test_create_booking_raises_clear_error_when_slot_is_taken(booking_data):
+def test_create_booking_raises_slot_unavailable_when_slot_is_taken(booking_data):
     tenant, end_user, service, slot = booking_data
 
     create_booking(
@@ -69,7 +67,7 @@ def test_create_booking_raises_clear_error_when_slot_is_taken(booking_data):
     )
 
     with pytest.raises(
-        BookingSlotUnavailableError,
+        SlotUnavailableError,
         match="no longer available",
     ):
         create_booking(
@@ -80,3 +78,22 @@ def test_create_booking_raises_clear_error_when_slot_is_taken(booking_data):
         )
 
     assert Booking.objects.count() == 1
+
+
+def test_create_booking_does_not_hide_unrelated_integrity_error(booking_data):
+    tenant, end_user, service, slot = booking_data
+
+    invalid_slot = TimeSlot(
+        start=slot.start,
+        end=slot.start,
+    )
+
+    with pytest.raises(IntegrityError):
+        create_booking(
+            tenant=tenant,
+            end_user=end_user,
+            slot=invalid_slot,
+            service=service,
+        )
+
+    assert Booking.objects.count() == 0
