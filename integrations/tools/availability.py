@@ -1,12 +1,14 @@
 """Availability tools for the conversational booking pipeline."""
 
-from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
 
 from bookings.models import BlockedDate, Booking
+from integrations.calendar.base import TimeSlot
+from integrations.calendar.registry import get_calendar_provider
+from integrations.models import CalendarConnection
 
 DEFAULT_WORKING_HOURS = {
     "mon": ["09:00", "17:00"],
@@ -15,14 +17,6 @@ DEFAULT_WORKING_HOURS = {
     "thu": ["09:00", "17:00"],
     "fri": ["09:00", "17:00"],
 }
-
-
-@dataclass(frozen=True)
-class TimeSlot:
-    """Represent one appointment time window."""
-
-    start: datetime
-    end: datetime
 
 
 def _to_tenant_timezone(value: datetime, tenant_timezone: ZoneInfo) -> datetime:
@@ -110,6 +104,26 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
         ).order_by("scheduled_start")
     )
 
+    external_busy_intervals = []
+
+    calendar_connection = (
+        CalendarConnection.objects.filter(tenant=tenant)
+        .select_related("tenant")
+        .first()
+    )
+
+    if calendar_connection is not None:
+        provider = get_calendar_provider(calendar_connection)
+
+        if provider is not None:
+            external_busy_intervals = provider.get_busy_intervals(
+                calendar_connection,
+                TimeSlot(
+                    start=range_start,
+                    end=range_end,
+                ),
+            )
+
     available_slots = []
     working_hours = tenant.working_hours or DEFAULT_WORKING_HOURS
     current_date = first_date
@@ -164,6 +178,27 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
 
             busy_start = booking_start - buffer
             busy_end = booking_end + buffer
+
+            if busy_start < window_end and busy_end > window_start:
+                busy_intervals.append(
+                    (
+                        max(busy_start, window_start),
+                        min(busy_end, window_end),
+                    )
+                )
+
+        for external_interval in external_busy_intervals:
+            external_start = _to_tenant_timezone(
+                external_interval.start,
+                tenant_timezone,
+            )
+            external_end = _to_tenant_timezone(
+                external_interval.end,
+                tenant_timezone,
+            )
+
+            busy_start = external_start - buffer
+            busy_end = external_end + buffer
 
             if busy_start < window_end and busy_end > window_start:
                 busy_intervals.append(
