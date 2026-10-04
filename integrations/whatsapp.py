@@ -11,6 +11,94 @@ GRAPH_API_VERSION = "v26.0"
 GRAPH_API_BASE_URL = "https://graph.facebook.com"
 
 
+class WhatsAppMediaDownloadError(RuntimeError):
+    """Raised when WhatsApp media cannot be downloaded."""
+
+
+def _access_token_text(tenant):
+    """Return the tenant WhatsApp access token as text."""
+    access_token = tenant.whatsapp_access_token
+
+    if isinstance(access_token, memoryview):
+        access_token = bytes(access_token)
+
+    if isinstance(access_token, bytes):
+        access_token = access_token.decode("utf-8")
+
+    return access_token
+
+
+def download_media(tenant, media_reference):
+    """Download one WhatsApp media object from Meta's Graph API."""
+    if not media_reference:
+        raise WhatsAppMediaDownloadError(
+            "Cannot download WhatsApp media without a media reference."
+        )
+
+    if not tenant.whatsapp_access_token:
+        raise WhatsAppMediaDownloadError(
+            "Cannot download WhatsApp media without tenant credentials."
+        )
+
+    access_token = _access_token_text(tenant)
+
+    metadata_url = f"{GRAPH_API_BASE_URL}/" f"{GRAPH_API_VERSION}/" f"{media_reference}"
+
+    metadata_request = Request(
+        metadata_url,
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+        method="GET",
+    )
+
+    try:
+        with urlopen(metadata_request) as response:
+            status = response.getcode()
+
+            if not 200 <= status < 300:
+                raise WhatsAppMediaDownloadError(
+                    "WhatsApp media metadata request returned " f"status={status}."
+                )
+
+            metadata = json.loads(response.read().decode("utf-8"))
+
+        media_url = metadata.get("url")
+
+        if not media_url:
+            raise WhatsAppMediaDownloadError(
+                "WhatsApp media metadata did not contain a download URL."
+            )
+
+        media_request = Request(
+            media_url,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+            },
+            method="GET",
+        )
+
+        with urlopen(media_request) as response:
+            status = response.getcode()
+
+            if not 200 <= status < 300:
+                raise WhatsAppMediaDownloadError(
+                    "WhatsApp media download returned " f"status={status}."
+                )
+
+            media_bytes = response.read()
+
+    except (HTTPError, URLError, json.JSONDecodeError) as exc:
+        raise WhatsAppMediaDownloadError("WhatsApp media download failed.") from exc
+
+    mime_type = metadata.get(
+        "mime_type",
+        "application/octet-stream",
+    )
+
+    return media_bytes, mime_type
+
+
 def _active_conversation_for_recipient(
     tenant,
     to_phone_number,
@@ -70,13 +158,7 @@ def send_text_message(
         )
         return False
 
-    access_token = tenant.whatsapp_access_token
-
-    if isinstance(access_token, memoryview):
-        access_token = bytes(access_token)
-
-    if isinstance(access_token, bytes):
-        access_token = access_token.decode("utf-8")
+    access_token = _access_token_text(tenant)
 
     url = (
         f"{GRAPH_API_BASE_URL}/"

@@ -237,3 +237,7 @@ ANTHROPIC_MAX_TOKENS = env.int(
     "ANTHROPIC_MAX_TOKENS",
     default=1024,
 )
+
+# Audio transcription
+# Keep disabled until a transcription provider is explicitly configured.
+TRANSCRIPTION_BACKEND = env("TRANSCRIPTION_BACKEND", default="disabled")
