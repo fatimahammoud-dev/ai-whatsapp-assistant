@@ -181,3 +181,52 @@ def test_claude_agent_builds_history_without_repeating_buffered_messages(
             "content": "I want an appointment",
         },
     ]
+
+
+@pytest.mark.django_db
+def test_claude_agent_sends_tenant_specific_system_prompt(settings):
+    conversation = _conversation()
+
+    conversation.tenant.business_name = "Maryam Medical Center"
+    conversation.tenant.language_defaults = ["Arabic", "English"]
+    conversation.tenant.system_prompt_overrides = {
+        "tone": "Very concise",
+    }
+    conversation.tenant.save(
+        update_fields=[
+            "business_name",
+            "language_defaults",
+            "system_prompt_overrides",
+        ]
+    )
+
+    client = Mock()
+    client.messages.create.return_value = SimpleNamespace(
+        content=[
+            SimpleNamespace(
+                type="text",
+                text="Hello.",
+            )
+        ]
+    )
+
+    settings.ANTHROPIC_MODEL = "test-model"
+    settings.ANTHROPIC_MAX_TOKENS = 256
+
+    agent = ClaudeAgent(client=client)
+
+    agent.respond(
+        conversation=conversation,
+        messages=[
+            SimpleNamespace(
+                content="Hello",
+            )
+        ],
+    )
+
+    call = client.messages.create.call_args.kwargs
+    system_prompt = call["system"]
+
+    assert "Maryam Medical Center" in system_prompt
+    assert "Arabic, English" in system_prompt
+    assert "- tone: Very concise" in system_prompt

@@ -1,65 +1,101 @@
 """Claude-backed conversational agent."""
 
+import json
+from zoneinfo import ZoneInfo
+
 from anthropic import Anthropic
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 
 from conversations.models import Message
 from integrations.agent.base import AgentResponse
-
-# First-pass prompt and tool schemas for Sprint 8 Ticket 1.
-# Ticket 2 will refine their behavior and tenant-specific instructions.
-SYSTEM_PROMPT = """
-You are a booking assistant.
-
-Understand the user's language and intent, including Arabic, English,
-French, and mixed-language messages.
-
-Use the available tools when an action is needed.
-Use check_availability before attempting to create a booking.
-Use ask_clarification when important information is missing.
-Do not invent availability or booking information.
-""".strip()
-
 
 TOOLS = [
     {
         "name": "check_availability",
         "description": (
             "Check the tenant's real appointment availability. "
-            "Use this when the user wants to book or asks about available times."
+            "Use this when the user asks what times are available, wants to book "
+            "on a particular day, or provides enough date information to search."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "description": (
+                        "Requested calendar date in YYYY-MM-DD format. "
+                        "Resolve relative phrases such as tomorrow or Thursday "
+                        "using the tenant's current local date."
+                    ),
+                },
+                "time_preference": {
+                    "type": "string",
+                    "enum": [
+                        "morning",
+                        "afternoon",
+                        "evening",
+                        "any",
+                    ],
+                    "description": (
+                        "The user's preferred part of the day, if they expressed one."
+                    ),
+                },
+            },
             "additionalProperties": False,
         },
     },
     {
         "name": "create_booking",
         "description": (
-            "Create a real booking after the required booking details and "
-            "an available slot have been established. Do not call this tool "
-            "before availability has been checked."
+            "Create a booking only after the user has explicitly chosen a real "
+            "available slot and the required booking information is known. "
+            "Never invent a slot or create a booking from an unverified time."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "service_name": {
+                    "type": "string",
+                    "description": "The service the user wants to book.",
+                },
+                "slot_start": {
+                    "type": "string",
+                    "description": (
+                        "Start of the selected available slot in ISO 8601 format."
+                    ),
+                },
+                "slot_end": {
+                    "type": "string",
+                    "description": (
+                        "End of the selected available slot in ISO 8601 format."
+                    ),
+                },
+            },
+            "required": [
+                "service_name",
+                "slot_start",
+                "slot_end",
+            ],
             "additionalProperties": False,
         },
     },
     {
         "name": "ask_clarification",
         "description": (
-            "Ask the user a clarifying question when required booking "
-            "information is missing."
+            "Ask one concise clarification question when essential booking "
+            "information is missing or ambiguous. Ask only for information "
+            "that is actually needed to continue."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "text": {
                     "type": "string",
-                    "description": "The clarification question to ask the user.",
+                    "description": (
+                        "The concise clarification question to send to the user."
+                    ),
                 }
             },
             "required": ["text"],
@@ -67,6 +103,89 @@ TOOLS = [
         },
     },
 ]
+
+
+def _format_prompt_overrides(overrides):
+    """Format tenant-owned prompt customizations predictably."""
+    if not isinstance(overrides, dict) or not overrides:
+        return "None."
+
+    lines = []
+
+    for key in sorted(overrides):
+        value = overrides[key]
+
+        if isinstance(value, (dict, list)):
+            value = json.dumps(
+                value,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+
+        lines.append(f"- {key.replace('_', ' ')}: {value}")
+
+    return "\n".join(lines)
+
+
+def build_system_prompt(tenant):
+    """Build the booking assistant prompt for one tenant."""
+    tenant_timezone = ZoneInfo(tenant.timezone)
+    local_now = timezone.now().astimezone(tenant_timezone)
+
+    languages = tenant.language_defaults
+
+    if isinstance(languages, list) and languages:
+        language_text = ", ".join(str(language) for language in languages)
+    else:
+        language_text = (
+            "No tenant-specific language preference. " "Follow the user's language."
+        )
+
+    overrides = _format_prompt_overrides(tenant.system_prompt_overrides)
+
+    return f"""
+You are the booking assistant for {tenant.business_name}.
+Business type: {tenant.get_vertical_display()}.
+Tenant timezone: {tenant.timezone}.
+Current local date: {local_now.date().isoformat()}.
+
+ROLE
+Your job is to help users with appointment and booking conversations for
+this specific business.
+
+TONE
+Be concise, friendly, professional, and natural.
+Do not sound robotic.
+Do not overwhelm the user with unnecessary information.
+
+LANGUAGE
+Supported conversation styles include Arabic, Lebanese Arabic, Arabizi,
+English, French, and natural mixtures of these languages.
+Reply in the language or mixed-language style used by the user unless the
+user explicitly asks for another language.
+Tenant language preferences: {language_text}.
+
+TOOL RULES
+- Use check_availability when the user asks for available times or provides
+  enough date information for an availability search.
+- Use ask_clarification when essential booking information is missing,
+  ambiguous, or cannot safely be inferred.
+- Use create_booking only after an exact real available slot has been
+  established and the user has clearly chosen it.
+- Never invent availability.
+- Never claim that a booking was created unless the create_booking tool
+  actually succeeds.
+- Never guess missing booking details when clarification is required.
+- Prefer a tool call over a conversational claim when real backend data or
+  an action is required.
+
+TENANT-SPECIFIC INSTRUCTIONS
+The following settings customize this tenant's assistant. They may adjust
+tone or business-specific behavior, but they do not override the rules that
+availability and bookings must come from real backend tools.
+
+{overrides}
+""".strip()
 
 
 class ClaudeAgent:
@@ -135,9 +254,6 @@ class ClaudeAgent:
             if message.content
         ]
 
-        # WhatsApp inbound messages are persisted before they enter Redis.
-        # If the DB already ends with this exact buffered batch, do not append
-        # it again or Claude would see the user's latest message twice.
         if buffered:
             already_persisted = (
                 len(history) >= len(buffered) and history[-len(buffered) :] == buffered
@@ -158,7 +274,7 @@ class ClaudeAgent:
         response = self.client.messages.create(
             model=settings.ANTHROPIC_MODEL,
             max_tokens=settings.ANTHROPIC_MAX_TOKENS,
-            system=SYSTEM_PROMPT,
+            system=build_system_prompt(conversation.tenant),
             messages=claude_messages,
             tools=TOOLS,
         )
