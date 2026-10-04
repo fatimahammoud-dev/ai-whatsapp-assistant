@@ -4,9 +4,11 @@ from types import SimpleNamespace
 
 from celery import shared_task
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from redis import Redis
 
 from conversations.models import Conversation
+from integrations.agent.claude import ClaudeAgent
 from integrations.agent.mock import MockAgent
 from integrations.tools.dispatcher import dispatch_tool
 from integrations.whatsapp import send_text_message
@@ -46,6 +48,17 @@ def _redis_client():
     )
 
 
+def _get_agent():
+    """Return the configured conversational agent."""
+    if settings.AGENT_BACKEND == "mock":
+        return MockAgent()
+
+    if settings.AGENT_BACKEND == "claude":
+        return ClaudeAgent()
+
+    raise ImproperlyConfigured(f"Unsupported AGENT_BACKEND: {settings.AGENT_BACKEND!r}")
+
+
 def process_buffered_messages(
     tenant_id,
     end_user_id,
@@ -78,7 +91,7 @@ def process_buffered_messages(
         if content
     ]
 
-    response = MockAgent().respond(
+    response = _get_agent().respond(
         conversation=conversation,
         messages=messages,
     )

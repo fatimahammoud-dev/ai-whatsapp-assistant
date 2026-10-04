@@ -225,3 +225,15 @@ MAILERS = {
 # Celery / Redis
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
 CELERY_BROKER_URL = REDIS_URL
+
+# Conversational agent / Anthropic
+AGENT_BACKEND = env("AGENT_BACKEND", default="mock")
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+ANTHROPIC_MODEL = env(
+    "ANTHROPIC_MODEL",
+    default="claude-sonnet-5-5",
+)
+ANTHROPIC_MAX_TOKENS = env.int(
+    "ANTHROPIC_MAX_TOKENS",
+    default=1024,
+)

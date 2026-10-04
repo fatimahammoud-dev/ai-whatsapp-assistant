@@ -167,3 +167,45 @@ def test_process_buffered_messages_stops_without_active_conversation(
 
     respond_mock.assert_not_called()
     send_mock.assert_not_called()
+
+
+def test_process_buffered_messages_uses_claude_when_configured(
+    monkeypatch,
+    settings,
+):
+    conversation = _fake_conversation()
+    _mock_conversation_query(monkeypatch, conversation)
+
+    settings.AGENT_BACKEND = "claude"
+    settings.ANTHROPIC_API_KEY = "test-api-key"
+
+    respond_mock = Mock(
+        return_value=AgentResponse(
+            action="reply",
+            text="Reply from Claude.",
+        )
+    )
+    send_mock = Mock()
+
+    monkeypatch.setattr(
+        "integrations.tasks.ClaudeAgent.respond",
+        respond_mock,
+    )
+    monkeypatch.setattr(
+        "integrations.tasks.send_text_message",
+        send_mock,
+    )
+
+    process_buffered_messages(
+        tenant_id=101,
+        end_user_id=202,
+        concatenated_messages="Hello Claude",
+    )
+
+    respond_mock.assert_called_once()
+
+    send_mock.assert_called_once_with(
+        conversation.tenant,
+        "96170123456",
+        "Reply from Claude.",
+    )
