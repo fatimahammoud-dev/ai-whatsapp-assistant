@@ -8,8 +8,8 @@ from django.core.exceptions import ImproperlyConfigured
 from redis import Redis
 
 from conversations.models import Conversation
-from integrations.agent.claude import ClaudeAgent
 from integrations.agent.mock import MockAgent
+from integrations.agent.openrouter import OpenRouterAgent
 from integrations.tools.dispatcher import dispatch_tool
 from integrations.whatsapp import send_text_message
 
@@ -53,8 +53,8 @@ def _get_agent():
     if settings.AGENT_BACKEND == "mock":
         return MockAgent()
 
-    if settings.AGENT_BACKEND == "claude":
-        return ClaudeAgent()
+    if settings.AGENT_BACKEND == "openrouter":
+        return OpenRouterAgent()
 
     raise ImproperlyConfigured(f"Unsupported AGENT_BACKEND: {settings.AGENT_BACKEND!r}")
 

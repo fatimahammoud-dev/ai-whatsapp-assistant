@@ -32,7 +32,11 @@ def _mock_conversation_query(monkeypatch, conversation):
     )
 
 
-def test_process_buffered_messages_sends_plain_agent_reply(monkeypatch):
+def test_process_buffered_messages_sends_plain_agent_reply(
+    monkeypatch,
+    settings,
+):
+    settings.AGENT_BACKEND = "mock"
     conversation = _fake_conversation()
     _mock_conversation_query(monkeypatch, conversation)
 
@@ -75,7 +79,11 @@ def test_process_buffered_messages_sends_plain_agent_reply(monkeypatch):
     )
 
 
-def test_process_buffered_messages_recognizes_tool_call(monkeypatch):
+def test_process_buffered_messages_recognizes_tool_call(
+    monkeypatch,
+    settings,
+):
+    settings.AGENT_BACKEND = "mock"
     conversation = _fake_conversation()
     _mock_conversation_query(monkeypatch, conversation)
 
@@ -169,26 +177,27 @@ def test_process_buffered_messages_stops_without_active_conversation(
     send_mock.assert_not_called()
 
 
-def test_process_buffered_messages_uses_claude_when_configured(
+def test_process_buffered_messages_uses_openrouter_when_configured(
     monkeypatch,
     settings,
 ):
     conversation = _fake_conversation()
     _mock_conversation_query(monkeypatch, conversation)
 
-    settings.AGENT_BACKEND = "claude"
-    settings.ANTHROPIC_API_KEY = "test-api-key"
+    settings.AGENT_BACKEND = "openrouter"
+    settings.OPENROUTER_API_KEY = "test-api-key"
+    settings.OPENROUTER_MODEL = "test/model"
 
     respond_mock = Mock(
         return_value=AgentResponse(
             action="reply",
-            text="Reply from Claude.",
+            text="Reply from LLM.",
         )
     )
     send_mock = Mock()
 
     monkeypatch.setattr(
-        "integrations.tasks.ClaudeAgent.respond",
+        "integrations.tasks.OpenRouterAgent.respond",
         respond_mock,
     )
     monkeypatch.setattr(
@@ -207,5 +216,5 @@ def test_process_buffered_messages_uses_claude_when_configured(
     send_mock.assert_called_once_with(
         conversation.tenant,
         "96170123456",
-        "Reply from Claude.",
+        "Reply from LLM.",
     )

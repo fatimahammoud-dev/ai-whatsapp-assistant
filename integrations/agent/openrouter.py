@@ -1,12 +1,12 @@
-"""Claude-backed conversational agent."""
+"""OpenRouter-backed conversational agent."""
 
 import json
 from zoneinfo import ZoneInfo
 
-from anthropic import Anthropic
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
+from openai import OpenAI
 
 from conversations.models import Message
 from integrations.agent.base import AgentResponse
@@ -105,6 +105,19 @@ TOOLS = [
 ]
 
 
+OPENROUTER_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool["description"],
+            "parameters": tool["input_schema"],
+        },
+    }
+    for tool in TOOLS
+]
+
+
 def _format_prompt_overrides(overrides):
     """Format tenant-owned prompt customizations predictably."""
     if not isinstance(overrides, dict) or not overrides:
@@ -188,21 +201,27 @@ availability and bookings must come from real backend tools.
 """.strip()
 
 
-class ClaudeAgent:
-    """Use Claude while preserving the shared AgentResponse contract."""
+class OpenRouterAgent:
+    """Use OpenRouter while preserving the shared AgentResponse contract."""
 
     def __init__(self, client=None):
         if client is not None:
             self.client = client
             return
 
-        if not settings.ANTHROPIC_API_KEY:
+        if not settings.OPENROUTER_API_KEY:
             raise ImproperlyConfigured(
-                "ANTHROPIC_API_KEY is required when using ClaudeAgent."
+                "OPENROUTER_API_KEY is required when using OpenRouterAgent."
             )
 
-        self.client = Anthropic(
-            api_key=settings.ANTHROPIC_API_KEY,
+        if not settings.OPENROUTER_MODEL:
+            raise ImproperlyConfigured(
+                "OPENROUTER_MODEL is required when using OpenRouterAgent."
+            )
+
+        self.client = OpenAI(
+            base_url=settings.OPENROUTER_BASE_URL,
+            api_key=settings.OPENROUTER_API_KEY,
         )
 
     @staticmethod
@@ -266,37 +285,55 @@ class ClaudeAgent:
 
     def respond(self, conversation, messages):
         """Return a plain reply or tool call as an AgentResponse."""
-        claude_messages = self._build_messages(
+        conversation_messages = self._build_messages(
             conversation=conversation,
             new_messages=messages,
         )
 
-        response = self.client.messages.create(
-            model=settings.ANTHROPIC_MODEL,
-            max_tokens=settings.ANTHROPIC_MAX_TOKENS,
-            system=build_system_prompt(conversation.tenant),
-            messages=claude_messages,
-            tools=TOOLS,
-        )
-
-        for block in response.content:
-            if block.type == "tool_use":
-                return AgentResponse(
-                    action="tool_call",
-                    tool=block.name,
-                    tool_args=dict(block.input),
-                )
-
-        text_blocks = [
-            block.text
-            for block in response.content
-            if block.type == "text" and block.text
+        request_messages = [
+            {
+                "role": "system",
+                "content": build_system_prompt(conversation.tenant),
+            },
+            *conversation_messages,
         ]
 
-        if text_blocks:
+        response = self.client.chat.completions.create(
+            model=settings.OPENROUTER_MODEL,
+            max_tokens=settings.OPENROUTER_MAX_TOKENS,
+            messages=request_messages,
+            tools=OPENROUTER_TOOLS,
+        )
+
+        if not response.choices:
+            raise ValueError("OpenRouter returned no response choices.")
+
+        message = response.choices[0].message
+        tool_calls = getattr(message, "tool_calls", None) or []
+
+        if tool_calls:
+            tool_call = tool_calls[0]
+
+            try:
+                tool_args = json.loads(tool_call.function.arguments or "{}")
+            except json.JSONDecodeError as exc:
+                raise ValueError("OpenRouter returned invalid tool arguments.") from exc
+
+            if not isinstance(tool_args, dict):
+                raise ValueError("OpenRouter tool arguments must be a JSON object.")
+
             return AgentResponse(
-                action="reply",
-                text="\n".join(text_blocks),
+                action="tool_call",
+                tool=tool_call.function.name,
+                tool_args=tool_args,
             )
 
-        raise ValueError("Claude returned no supported response content.")
+        content = getattr(message, "content", None)
+
+        if isinstance(content, str) and content.strip():
+            return AgentResponse(
+                action="reply",
+                text=content,
+            )
+
+        raise ValueError("OpenRouter returned no supported response content.")

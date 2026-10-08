@@ -12,7 +12,10 @@ RECIPIENT = "96170123456"
 
 
 @pytest.mark.django_db
-def test_booking_message_runs_full_mock_agent_pipeline_without_network():
+def test_booking_message_runs_full_mock_agent_pipeline_without_network(
+    settings,
+):
+    settings.AGENT_BACKEND = "mock"
     tenant = Tenant.objects.create(
         business_name="Pipeline Integration Test",
         vertical=Tenant.Vertical.DOCTOR,

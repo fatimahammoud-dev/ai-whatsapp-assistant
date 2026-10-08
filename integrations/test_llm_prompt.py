@@ -1,4 +1,4 @@
-from integrations.agent.claude import TOOLS, build_system_prompt
+from integrations.agent.openrouter import TOOLS, build_system_prompt
 from tenants.models import Tenant
 
 

@@ -226,17 +226,16 @@ MAILERS = {
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
 CELERY_BROKER_URL = REDIS_URL
 
-# Conversational agent / Anthropic
+# Conversational agent / OpenRouter
 AGENT_BACKEND = env("AGENT_BACKEND", default="mock")
-ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
-ANTHROPIC_MODEL = env(
-    "ANTHROPIC_MODEL",
-    default="claude-sonnet-5-5",
-)
-ANTHROPIC_MAX_TOKENS = env.int(
-    "ANTHROPIC_MAX_TOKENS",
+OPENROUTER_API_KEY = env("OPENROUTER_API_KEY", default="")
+OPENROUTER_MODEL = env("OPENROUTER_MODEL", default="")
+OPENROUTER_MAX_TOKENS = env.int(
+    "OPENROUTER_MAX_TOKENS",
     default=1024,
 )
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
 
 # Audio transcription
 # Keep disabled until a transcription provider is explicitly configured.

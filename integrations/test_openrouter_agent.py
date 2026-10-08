@@ -4,21 +4,26 @@ from unittest.mock import Mock
 import pytest
 
 from conversations.models import Conversation, EndUser, Message
-from integrations.agent.claude import ClaudeAgent
+from integrations.agent.openrouter import (
+    OPENROUTER_TOOLS,
+    OpenRouterAgent,
+)
 from tenants.models import Tenant
 
 
 def _conversation():
     tenant = Tenant.objects.create(
-        business_name="Claude Agent Test",
+        business_name="OpenRouter Agent Test",
         vertical=Tenant.Vertical.DOCTOR,
-        phone_number_id="claude-test-phone-id",
-        whatsapp_access_token=b"claude-test-token",
+        phone_number_id="openrouter-test-phone-id",
+        whatsapp_access_token=b"openrouter-test-token",
     )
+
     end_user = EndUser.objects.create(
         tenant=tenant,
         phone_number="96170123456",
     )
+
     return Conversation.objects.create(
         tenant=tenant,
         end_user=end_user,
@@ -26,8 +31,41 @@ def _conversation():
     )
 
 
+def _text_response(text):
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=text,
+                    tool_calls=None,
+                )
+            )
+        ]
+    )
+
+
+def _tool_response(name, arguments):
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=None,
+                    tool_calls=[
+                        SimpleNamespace(
+                            function=SimpleNamespace(
+                                name=name,
+                                arguments=arguments,
+                            )
+                        )
+                    ],
+                )
+            )
+        ]
+    )
+
+
 @pytest.mark.django_db
-def test_claude_agent_translates_text_response_to_agent_response(settings):
+def test_openrouter_agent_translates_text_response(settings):
     conversation = _conversation()
 
     Message.objects.create(
@@ -38,23 +76,20 @@ def test_claude_agent_translates_text_response_to_agent_response(settings):
     )
 
     client = Mock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[
-            SimpleNamespace(
-                type="text",
-                text="Hello! How can I help?",
-            )
-        ]
+    client.chat.completions.create.return_value = _text_response(
+        "Hello! How can I help?"
     )
 
-    settings.ANTHROPIC_MODEL = "test-model"
-    settings.ANTHROPIC_MAX_TOKENS = 256
+    settings.OPENROUTER_MODEL = "test/model"
+    settings.OPENROUTER_MAX_TOKENS = 256
 
-    agent = ClaudeAgent(client=client)
+    agent = OpenRouterAgent(client=client)
 
     response = agent.respond(
         conversation=conversation,
-        messages=[SimpleNamespace(content="Hello")],
+        messages=[
+            SimpleNamespace(content="Hello"),
+        ],
     )
 
     assert response.action == "reply"
@@ -62,11 +97,14 @@ def test_claude_agent_translates_text_response_to_agent_response(settings):
     assert response.tool is None
     assert response.tool_args == {}
 
-    call = client.messages.create.call_args.kwargs
+    call = client.chat.completions.create.call_args.kwargs
 
-    assert call["model"] == "test-model"
+    assert call["model"] == "test/model"
     assert call["max_tokens"] == 256
-    assert call["messages"] == [
+    assert call["tools"] == OPENROUTER_TOOLS
+
+    assert call["messages"][0]["role"] == "system"
+    assert call["messages"][1:] == [
         {
             "role": "user",
             "content": "Hello",
@@ -75,7 +113,7 @@ def test_claude_agent_translates_text_response_to_agent_response(settings):
 
 
 @pytest.mark.django_db
-def test_claude_agent_translates_tool_use_to_agent_response(settings):
+def test_openrouter_agent_translates_tool_call(settings):
     conversation = _conversation()
 
     Message.objects.create(
@@ -86,28 +124,19 @@ def test_claude_agent_translates_tool_use_to_agent_response(settings):
     )
 
     client = Mock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[
-            SimpleNamespace(
-                type="tool_use",
-                name="check_availability",
-                input={},
-            )
-        ]
+    client.chat.completions.create.return_value = _tool_response(
+        "check_availability",
+        "{}",
     )
 
-    settings.ANTHROPIC_MODEL = "test-model"
-    settings.ANTHROPIC_MAX_TOKENS = 256
+    settings.OPENROUTER_MODEL = "test/model"
+    settings.OPENROUTER_MAX_TOKENS = 256
 
-    agent = ClaudeAgent(client=client)
+    agent = OpenRouterAgent(client=client)
 
     response = agent.respond(
         conversation=conversation,
-        messages=[
-            SimpleNamespace(
-                content="I want to book an appointment",
-            )
-        ],
+        messages=[SimpleNamespace(content="I want to book an appointment")],
     )
 
     assert response.action == "tool_call"
@@ -117,7 +146,7 @@ def test_claude_agent_translates_tool_use_to_agent_response(settings):
 
 
 @pytest.mark.django_db
-def test_claude_agent_builds_history_without_repeating_buffered_messages(
+def test_openrouter_agent_builds_history_without_duplicate_buffer(
     settings,
 ):
     conversation = _conversation()
@@ -128,12 +157,14 @@ def test_claude_agent_builds_history_without_repeating_buffered_messages(
         message_type=Message.MessageType.TEXT,
         content="Hello",
     )
+
     Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.OUTBOUND,
         message_type=Message.MessageType.TEXT,
         content="How can I help?",
     )
+
     Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.INBOUND,
@@ -142,19 +173,12 @@ def test_claude_agent_builds_history_without_repeating_buffered_messages(
     )
 
     client = Mock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[
-            SimpleNamespace(
-                type="text",
-                text="Sure.",
-            )
-        ]
-    )
+    client.chat.completions.create.return_value = _text_response("Sure.")
 
-    settings.ANTHROPIC_MODEL = "test-model"
-    settings.ANTHROPIC_MAX_TOKENS = 256
+    settings.OPENROUTER_MODEL = "test/model"
+    settings.OPENROUTER_MAX_TOKENS = 256
 
-    agent = ClaudeAgent(client=client)
+    agent = OpenRouterAgent(client=client)
 
     agent.respond(
         conversation=conversation,
@@ -165,9 +189,9 @@ def test_claude_agent_builds_history_without_repeating_buffered_messages(
         ],
     )
 
-    call = client.messages.create.call_args.kwargs
+    call = client.chat.completions.create.call_args.kwargs
 
-    assert call["messages"] == [
+    assert call["messages"][1:] == [
         {
             "role": "user",
             "content": "Hello",
@@ -184,11 +208,14 @@ def test_claude_agent_builds_history_without_repeating_buffered_messages(
 
 
 @pytest.mark.django_db
-def test_claude_agent_sends_tenant_specific_system_prompt(settings):
+def test_openrouter_agent_sends_tenant_specific_prompt(settings):
     conversation = _conversation()
 
     conversation.tenant.business_name = "Maryam Medical Center"
-    conversation.tenant.language_defaults = ["Arabic", "English"]
+    conversation.tenant.language_defaults = [
+        "Arabic",
+        "English",
+    ]
     conversation.tenant.system_prompt_overrides = {
         "tone": "Very concise",
     }
@@ -201,31 +228,22 @@ def test_claude_agent_sends_tenant_specific_system_prompt(settings):
     )
 
     client = Mock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[
-            SimpleNamespace(
-                type="text",
-                text="Hello.",
-            )
-        ]
-    )
+    client.chat.completions.create.return_value = _text_response("Hello.")
 
-    settings.ANTHROPIC_MODEL = "test-model"
-    settings.ANTHROPIC_MAX_TOKENS = 256
+    settings.OPENROUTER_MODEL = "test/model"
+    settings.OPENROUTER_MAX_TOKENS = 256
 
-    agent = ClaudeAgent(client=client)
+    agent = OpenRouterAgent(client=client)
 
     agent.respond(
         conversation=conversation,
         messages=[
-            SimpleNamespace(
-                content="Hello",
-            )
+            SimpleNamespace(content="Hello"),
         ],
     )
 
-    call = client.messages.create.call_args.kwargs
-    system_prompt = call["system"]
+    call = client.chat.completions.create.call_args.kwargs
+    system_prompt = call["messages"][0]["content"]
 
     assert "Maryam Medical Center" in system_prompt
     assert "Arabic, English" in system_prompt
