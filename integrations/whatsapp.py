@@ -107,7 +107,10 @@ def _active_conversation_for_recipient(
         Conversation.objects.filter(
             tenant=tenant,
             end_user__phone_number=to_phone_number,
-            status=Conversation.Status.ACTIVE,
+            status__in=[
+                Conversation.Status.ACTIVE,
+                Conversation.Status.AWAITING_USER,
+            ],
         )
         .order_by("-started_at")
         .first()
@@ -126,7 +129,7 @@ def _log_successful_outbound_message(
 
     if conversation is None:
         logger.error(
-            "WhatsApp message was sent but no active conversation "
+            "WhatsApp message was sent but no active or awaiting conversation "
             "was found for outbound logging tenant_id=%s",
             tenant.pk,
         )

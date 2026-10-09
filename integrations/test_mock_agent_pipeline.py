@@ -14,6 +14,9 @@ def _fake_conversation():
             pk=202,
             phone_number="96170123456",
         ),
+        status="active",
+        pending_intent_state={},
+        save=Mock(),
     )
 
 

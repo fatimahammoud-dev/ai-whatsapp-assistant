@@ -113,3 +113,23 @@ def test_system_prompt_includes_current_local_weekday(
 
     assert "Current local date: 2026-10-08." in prompt
     assert "Current local weekday: Thursday." in prompt
+
+
+def test_system_prompt_includes_pending_booking_state():
+    tenant = _tenant()
+
+    prompt = build_system_prompt(
+        tenant,
+        pending_intent_state={
+            "intent": "booking",
+            "service_name": "Consultation",
+            "date": "2026-10-12",
+            "time_preference": "afternoon",
+        },
+    )
+
+    assert "CURRENT BOOKING STATE" in prompt
+    assert '"intent": "booking"' in prompt
+    assert '"service_name": "Consultation"' in prompt
+    assert '"date": "2026-10-12"' in prompt
+    assert '"time_preference": "afternoon"' in prompt

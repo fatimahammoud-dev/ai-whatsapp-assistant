@@ -96,9 +96,12 @@ def _resolve_whatsapp_context(payload):
         Conversation.objects.filter(
             tenant=tenant,
             end_user=end_user,
-            status=Conversation.Status.ACTIVE,
+            status__in=[
+                Conversation.Status.ACTIVE,
+                Conversation.Status.AWAITING_USER,
+            ],
         )
-        .order_by("started_at")
+        .order_by("-started_at")
         .first()
     )
 

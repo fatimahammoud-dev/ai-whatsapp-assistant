@@ -242,7 +242,7 @@ def compute_available_slots(tenant, service, date_range) -> list[TimeSlot]:
     return available_slots
 
 
-def check_availability(tenant, date_range) -> list[TimeSlot]:
+def check_availability(tenant, date_range, service=None) -> list[TimeSlot]:
     """Return real computed availability for the tenant.
 
     When no range is supplied, use the next seven tenant-local calendar days.
@@ -268,7 +268,7 @@ def check_availability(tenant, date_range) -> list[TimeSlot]:
 
     slots = compute_available_slots(
         tenant=tenant,
-        service=None,
+        service=service,
         date_range=date_range,
     )
 

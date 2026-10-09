@@ -22,6 +22,13 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
+                "service_name": {
+                    "type": "string",
+                    "description": (
+                        "The service already identified in this booking "
+                        "conversation, when known."
+                    ),
+                },
                 "date": {
                     "type": "string",
                     "description": (
@@ -96,7 +103,30 @@ TOOLS = [
                     "description": (
                         "The concise clarification question to send to the user."
                     ),
-                }
+                },
+                "service_name": {
+                    "type": "string",
+                    "description": (
+                        "The booking service already provided by the user, "
+                        "when known."
+                    ),
+                },
+                "date": {
+                    "type": "string",
+                    "description": (
+                        "Known requested date in YYYY-MM-DD format, when known."
+                    ),
+                },
+                "time_preference": {
+                    "type": "string",
+                    "enum": [
+                        "morning",
+                        "afternoon",
+                        "evening",
+                        "any",
+                    ],
+                    "description": ("Known time-of-day preference, when provided."),
+                },
             },
             "required": ["text"],
             "additionalProperties": False,
@@ -140,7 +170,7 @@ def _format_prompt_overrides(overrides):
     return "\n".join(lines)
 
 
-def build_system_prompt(tenant):
+def build_system_prompt(tenant, pending_intent_state=None):
     """Build the booking assistant prompt for one tenant."""
     tenant_timezone = ZoneInfo(tenant.timezone)
     local_now = timezone.now().astimezone(tenant_timezone)
@@ -155,6 +185,15 @@ def build_system_prompt(tenant):
         )
 
     overrides = _format_prompt_overrides(tenant.system_prompt_overrides)
+
+    if isinstance(pending_intent_state, dict):
+        pending_state_text = json.dumps(
+            pending_intent_state,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    else:
+        pending_state_text = "{}"
 
     return f"""
 You are the booking assistant for {tenant.business_name}.
@@ -192,6 +231,22 @@ TOOL RULES
 - Never guess missing booking details when clarification is required.
 - Prefer a tool call over a conversational claim when real backend data or
   an action is required.
+
+CURRENT BOOKING STATE
+{pending_state_text}
+
+MULTI-TURN BOOKING RULES
+- If CURRENT BOOKING STATE contains an active booking intent, continue that
+  same booking instead of restarting it.
+- Treat service_name, date, time_preference, and offered_slots already stored
+  in the state as known information.
+- Ask only for information that is still missing.
+- When calling ask_clarification, include any service_name, date, or
+  time_preference that is already known from the conversation.
+- When calling check_availability, include service_name when it is already
+  known.
+- offered_slots are exact real backend slots previously shown to the user.
+  Use create_booking only when the user has chosen one of those slots.
 
 TENANT-SPECIFIC INSTRUCTIONS
 The following settings customize this tenant's assistant. They may adjust
@@ -294,7 +349,14 @@ class OpenRouterAgent:
         request_messages = [
             {
                 "role": "system",
-                "content": build_system_prompt(conversation.tenant),
+                "content": build_system_prompt(
+                    conversation.tenant,
+                    pending_intent_state=getattr(
+                        conversation,
+                        "pending_intent_state",
+                        None,
+                    ),
+                ),
             },
             *conversation_messages,
         ]
