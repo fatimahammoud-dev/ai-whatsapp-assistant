@@ -1,10 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
 from integrations.tasks import (
+    BUFFER_TTL_SECONDS,
     DEBOUNCE_SECONDS,
     _buffer_key,
     _last_message_key,
@@ -15,6 +17,31 @@ from integrations.tasks import (
 
 TENANT_ID = 900001
 END_USER_ID = 900002
+
+
+@pytest.fixture(autouse=True)
+def mock_persisted_messages(monkeypatch):
+    contents = {
+        1001: "First message",
+        1002: "Second message",
+        1003: "Third message",
+        1004: "First batch",
+        1005: "Second batch",
+        1006: "Message to drain",
+        1007: "Concurrent message A",
+        1008: "Concurrent message B",
+    }
+
+    def fake_in_bulk(message_ids):
+        return {
+            message_id: SimpleNamespace(content=contents[message_id])
+            for message_id in message_ids
+        }
+
+    monkeypatch.setattr(
+        "integrations.tasks.Message.objects.in_bulk",
+        fake_in_bulk,
+    )
 
 
 @pytest.fixture
@@ -76,17 +103,17 @@ def test_three_rapid_messages_trigger_processing_once(
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "First message",
+        1001,
     )
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "Second message",
+        1002,
     )
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "Third message",
+        1003,
     )
 
     assert len(scheduled_tasks) == 3
@@ -140,7 +167,7 @@ def test_messages_after_debounce_window_process_separately(
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "First batch",
+        1004,
     )
 
     debounce_buffer_task.run(*scheduled_tasks[0])
@@ -148,7 +175,7 @@ def test_messages_after_debounce_window_process_separately(
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "Second batch",
+        1005,
     )
 
     debounce_buffer_task.run(*scheduled_tasks[1])
@@ -195,7 +222,7 @@ def test_buffer_is_cleared_after_processing(
     buffer_inbound_message(
         TENANT_ID,
         END_USER_ID,
-        "Message to drain",
+        1006,
     )
 
     debounce_buffer_task.run(*scheduled_tasks[0])
@@ -262,10 +289,7 @@ def test_near_simultaneous_messages_are_not_dropped_or_duplicated(
         process_mock,
     )
 
-    messages = [
-        "Concurrent message A",
-        "Concurrent message B",
-    ]
+    messages = [1007, 1008]
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
@@ -289,5 +313,28 @@ def test_near_simultaneous_messages_are_not_dropped_or_duplicated(
     processed_text = process_mock.call_args.args[2]
     processed_messages = processed_text.split("\n")
 
-    assert sorted(processed_messages) == sorted(messages)
+    assert sorted(processed_messages) == sorted(
+        ["Concurrent message A", "Concurrent message B"]
+    )
     assert len(processed_messages) == len(messages)
+
+
+def test_buffer_keys_have_expiration(monkeypatch, redis_client):
+    monkeypatch.setattr(
+        debounce_buffer_task,
+        "apply_async",
+        lambda *, args, countdown: None,
+    )
+
+    buffer_inbound_message(
+        TENANT_ID,
+        END_USER_ID,
+        1001,
+    )
+
+    for key in (
+        _buffer_key(TENANT_ID, END_USER_ID),
+        _last_message_key(TENANT_ID, END_USER_ID),
+    ):
+        ttl = redis_client.ttl(key)
+        assert 0 < ttl <= BUFFER_TTL_SECONDS

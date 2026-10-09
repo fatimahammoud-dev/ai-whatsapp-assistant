@@ -3,7 +3,7 @@ import logging
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from conversations.models import Conversation, Message
+from conversations.models import Message
 
 logger = logging.getLogger(__name__)
 
@@ -11,50 +11,18 @@ GRAPH_API_VERSION = "v26.0"
 GRAPH_API_BASE_URL = "https://graph.facebook.com"
 
 
-def _active_conversation_for_recipient(
-    tenant,
-    to_phone_number,
-):
-    return (
-        Conversation.objects.filter(
-            tenant=tenant,
-            end_user__phone_number=to_phone_number,
-            status=Conversation.Status.ACTIVE,
-        )
-        .order_by("-started_at")
-        .first()
-    )
-
-
-def _log_successful_outbound_message(
-    tenant,
-    to_phone_number,
-    text,
-):
-    conversation = _active_conversation_for_recipient(
-        tenant,
-        to_phone_number,
-    )
-
-    if conversation is None:
-        logger.error(
-            "WhatsApp message was sent but no active conversation "
-            "was found for outbound logging tenant_id=%s",
-            tenant.pk,
-        )
-        return
-
+def _log_successful_outbound_message(conversation, text, whatsapp_message_id):
     Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.OUTBOUND,
         message_type=Message.MessageType.TEXT,
         content=text,
+        whatsapp_message_id=whatsapp_message_id,
     )
 
 
 def send_text_message(
-    tenant,
-    to_phone_number,
+    conversation,
     text,
 ):
     """Send one WhatsApp text message for the given tenant.
@@ -62,6 +30,8 @@ def send_text_message(
     Failure policy:
     A failed API send is logged but is not persisted as an outbound Message.
     """
+    tenant = conversation.tenant
+    to_phone_number = conversation.end_user.phone_number
 
     if not tenant.phone_number_id or not tenant.whatsapp_access_token:
         logger.error(
@@ -106,7 +76,7 @@ def send_text_message(
     )
 
     try:
-        with urlopen(request) as response:
+        with urlopen(request, timeout=15) as response:
             status = response.getcode()
 
             if not 200 <= status < 300:
@@ -118,11 +88,27 @@ def send_text_message(
                 )
                 return False
 
+            response_data = json.loads(response.read())
+            messages = response_data.get("messages", [])
+            whatsapp_message_id = (
+                messages[0].get("id")
+                if messages and isinstance(messages[0], dict)
+                else None
+            )
+
     except HTTPError as exc:
         logger.error(
             "WhatsApp Cloud API returned non-2xx response " "status=%s tenant_id=%s",
             exc.code,
             tenant.pk,
+        )
+        return False
+
+    except TimeoutError as exc:
+        logger.error(
+            "WhatsApp Cloud API request timed out tenant_id=%s reason=%s",
+            tenant.pk,
+            exc,
         )
         return False
 
@@ -135,9 +121,9 @@ def send_text_message(
         return False
 
     _log_successful_outbound_message(
-        tenant,
-        to_phone_number,
+        conversation,
         text,
+        whatsapp_message_id,
     )
 
     return True
