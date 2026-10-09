@@ -161,6 +161,7 @@ You are the booking assistant for {tenant.business_name}.
 Business type: {tenant.get_vertical_display()}.
 Tenant timezone: {tenant.timezone}.
 Current local date: {local_now.date().isoformat()}.
+Current local weekday: {local_now.strftime("%A")}.
 
 ROLE
 Your job is to help users with appointment and booking conversations for

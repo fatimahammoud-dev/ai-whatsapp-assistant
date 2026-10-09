@@ -1,0 +1,44 @@
+﻿[
+  {
+    "id": "pure_arabic_tomorrow_afternoon",
+    "message": "بدي موعد بكرا بعد الظهر",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-09",
+    "expected_time_preference": "afternoon"
+  },
+  {
+    "id": "arabizi_tomorrow_afternoon",
+    "message": "Fi availability bukra ba3ed el dohor?",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-09",
+    "expected_time_preference": "afternoon"
+  },
+  {
+    "id": "arabic_english_tomorrow_afternoon",
+    "message": "بدي appointment tomorrow afternoon",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-09",
+    "expected_time_preference": "afternoon"
+  },
+  {
+    "id": "arabizi_english_friday_morning",
+    "message": "Marhaba, fi appointment Friday morning?",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-09",
+    "expected_time_preference": "morning"
+  },
+  {
+    "id": "french_arabic_tomorrow_morning",
+    "message": "Bonjour, بدي rendez-vous بكرا الصبح",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-09",
+    "expected_time_preference": "morning"
+  },
+  {
+    "id": "arabizi_english_thursday_afternoon",
+    "message": "Fik t2elle shu fi availability Thursday afternoon?",
+    "expected_tool": "check_availability",
+    "expected_date": "2026-10-08",
+    "expected_time_preference": "afternoon"
+  }
+]

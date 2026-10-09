@@ -1,3 +1,6 @@
+from datetime import datetime
+from datetime import timezone as dt_timezone
+
 from integrations.agent.openrouter import TOOLS, build_system_prompt
 from tenants.models import Tenant
 
@@ -86,3 +89,27 @@ def test_clarification_schema_requires_text():
     tool = next(tool for tool in TOOLS if tool["name"] == "ask_clarification")
 
     assert tool["input_schema"]["required"] == ["text"]
+
+
+def test_system_prompt_includes_current_local_weekday(
+    monkeypatch,
+):
+    fixed_now = datetime(
+        2026,
+        10,
+        8,
+        8,
+        0,
+        tzinfo=dt_timezone.utc,
+    )
+
+    monkeypatch.setattr(
+        "integrations.agent.openrouter.timezone.now",
+        lambda: fixed_now,
+    )
+
+    tenant = _tenant()
+    prompt = build_system_prompt(tenant)
+
+    assert "Current local date: 2026-10-08." in prompt
+    assert "Current local weekday: Thursday." in prompt
