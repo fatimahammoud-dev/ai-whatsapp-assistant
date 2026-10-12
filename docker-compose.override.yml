@@ -14,6 +14,17 @@ services:
       HOME: /tmp
     command: python manage.py runserver 0.0.0.0:8000
 
+  celery:
+    build:
+      args:
+        REQUIREMENTS_FILE: requirements-dev.txt
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      HOME: /tmp
+
   db:
     ports:
       - "5432:5432"

@@ -5,6 +5,7 @@ import logging
 from secrets import compare_digest
 
 from django.conf import settings
+from django.db import transaction
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -14,6 +15,7 @@ from django.http import (
 from django.views.decorators.csrf import csrf_exempt
 
 from conversations.models import Conversation, EndUser, Message
+from integrations.tasks import buffer_inbound_message
 from tenants.models import Tenant
 
 logger = logging.getLogger(__name__)
@@ -42,8 +44,27 @@ def _has_valid_whatsapp_signature(request):
 
 
 def _extract_whatsapp_message(payload):
-    value = payload["entry"][0]["changes"][0]["value"]
-    message = value["messages"][0]
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list) or not entries or not isinstance(entries[0], dict):
+        raise ValueError("Invalid WhatsApp webhook entry")
+
+    changes = entries[0].get("changes")
+    if not isinstance(changes, list) or not changes or not isinstance(changes[0], dict):
+        raise ValueError("Invalid WhatsApp webhook changes")
+
+    value = changes[0].get("value")
+    if not isinstance(value, dict):
+        raise ValueError("Invalid WhatsApp webhook value")
+
+    messages = value.get("messages")
+    if (
+        not isinstance(messages, list)
+        or not messages
+        or not isinstance(messages[0], dict)
+    ):
+        raise ValueError("Invalid WhatsApp webhook messages")
+
+    message = messages[0]
 
     message_type = message["type"]
 
@@ -153,18 +174,25 @@ def whatsapp_webhook(request):
             KeyError,
             IndexError,
             TypeError,
+            ValueError,
         ):
             return HttpResponseBadRequest()
 
         if resolved_context is None:
             return HttpResponse(status=404)
 
-        _persist_inbound_message(
-            payload,
-            resolved_context,
-        )
+        with transaction.atomic():
+            message, created = _persist_inbound_message(
+                payload,
+                resolved_context,
+            )
 
-        logger.info("Inbound WhatsApp message persisted; processing would happen here.")
+            if created:
+                buffer_inbound_message(
+                    resolved_context["tenant"].pk,
+                    resolved_context["end_user"].pk,
+                    message.pk,
+                )
 
         return HttpResponse(status=200)
 

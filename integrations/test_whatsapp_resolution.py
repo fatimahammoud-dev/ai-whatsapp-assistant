@@ -104,6 +104,24 @@ def test_extracts_phone_number_sender_and_message_content(
     assert message_data["message_content"] == "Hello from WhatsApp"
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"entry": [{}]},
+        {"entry": [{"changes": [{}]}]},
+        {"entry": [{"changes": [{"value": {}}]}]},
+    ],
+)
+@override_settings(META_APP_SECRET=APP_SECRET)
+def test_missing_webhook_structure_returns_400(client, payload):
+    with pytest.raises(ValueError):
+        _extract_whatsapp_message(payload)
+
+    response = _post_payload(client, payload)
+    assert response.status_code == 400
+
+
 @pytest.mark.django_db
 @override_settings(META_APP_SECRET=APP_SECRET)
 def test_webhook_resolves_tenant_and_creates_end_user_and_conversation(
