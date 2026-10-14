@@ -15,6 +15,10 @@ from django.http import (
 from django.views.decorators.csrf import csrf_exempt
 
 from conversations.models import Conversation, EndUser, Message
+from integrations.audio import (
+    AudioTranscriptionError,
+    transcribe_audio_message,
+)
 from integrations.tasks import buffer_inbound_message
 from tenants.models import Tenant
 
@@ -70,15 +74,21 @@ def _extract_whatsapp_message(payload):
 
     if message_type == "text":
         content = message.get("text", {}).get("body", "")
+        media_reference = ""
     else:
-        # Audio/image transcription or description is handled later.
+        # Audio/image content is resolved from the referenced Meta media.
         content = ""
+        media_reference = message.get(
+            message_type,
+            {},
+        ).get("id", "")
 
     return {
         "phone_number_id": value["metadata"]["phone_number_id"],
         "sender_phone_number": message["from"],
         "message_content": content,
         "message_type": message_type,
+        "media_reference": media_reference,
         "whatsapp_message_id": message["id"],
     }
 
@@ -106,9 +116,12 @@ def _resolve_whatsapp_context(payload):
         Conversation.objects.filter(
             tenant=tenant,
             end_user=end_user,
-            status=Conversation.Status.ACTIVE,
+            status__in=[
+                Conversation.Status.ACTIVE,
+                Conversation.Status.AWAITING_USER,
+            ],
         )
-        .order_by("started_at")
+        .order_by("-started_at")
         .first()
     )
 
@@ -137,6 +150,7 @@ def _persist_inbound_message(payload, resolved_context):
             "direction": Message.Direction.INBOUND,
             "message_type": message_data["message_type"],
             "content": message_data["message_content"],
+            "media_reference": message_data["media_reference"],
             "raw_payload": payload,
         },
     )
@@ -188,6 +202,21 @@ def whatsapp_webhook(request):
             )
 
             if created:
+                if message.message_type == Message.MessageType.AUDIO:
+                    try:
+                        transcribe_audio_message(
+                            message,
+                            resolved_context["tenant"],
+                        )
+                    except AudioTranscriptionError:
+                        logger.exception(
+                            "Could not transcribe inbound WhatsApp audio "
+                            "message_id=%s tenant_id=%s",
+                            message.pk,
+                            resolved_context["tenant"].pk,
+                        )
+                        return HttpResponse(status=200)
+
                 buffer_inbound_message(
                     resolved_context["tenant"].pk,
                     resolved_context["end_user"].pk,

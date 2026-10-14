@@ -117,7 +117,7 @@ def test_webhook_persists_message_buffers_processing_and_returns_200(
 
 @pytest.mark.django_db
 @override_settings(META_APP_SECRET=APP_SECRET)
-def test_audio_with_empty_content_is_buffered_by_message_id(
+def test_audio_without_media_reference_is_not_buffered(
     client,
     tenant,
     inbound_payload,
@@ -146,11 +146,7 @@ def test_audio_with_empty_content_is_buffered_by_message_id(
     )
     assert saved.content == ""
 
-    buffer_mock.assert_called_once_with(
-        tenant.pk,
-        saved.conversation.end_user_id,
-        saved.pk,
-    )
+    buffer_mock.assert_not_called()
 
 
 @pytest.mark.django_db
