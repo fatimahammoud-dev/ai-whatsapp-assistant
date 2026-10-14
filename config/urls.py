@@ -4,7 +4,7 @@ URL configuration for config project.
 
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path
+from django.urls import include, path
 from django.views.generic import RedirectView
 
 from accounts.views import dashboard_home
@@ -19,6 +19,7 @@ urlpatterns = [
         name="home",
     ),
     path("admin/", admin.site.urls),
+    path("conversations/", include("conversations.urls")),
     path("health/", healthcheck, name="healthcheck"),
     path("webhook/whatsapp/", whatsapp_webhook, name="whatsapp-webhook"),
     path(

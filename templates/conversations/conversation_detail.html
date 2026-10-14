@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Conversation</title>
+</head>
+<body>
+    <p><a href="{% url 'conversation-list' %}">Back to conversations</a></p>
+
+    <h1>{{ conversation.end_user }}</h1>
+
+    <p>Status: {{ conversation.get_status_display }}</p>
+
+    <h2>Messages</h2>
+
+    <ul>
+        {% for message in messages %}
+            <li>
+                <strong>{{ message.get_direction_display }}</strong>
+                —
+                {{ message.created_at|date:"Y-m-d H:i" }}
+                —
+                {{ message.content }}
+            </li>
+        {% empty %}
+            <li>No messages.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
