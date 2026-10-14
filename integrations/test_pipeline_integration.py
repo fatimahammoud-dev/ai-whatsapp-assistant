@@ -64,6 +64,9 @@ def test_booking_message_runs_full_mock_agent_pipeline_without_network(
     ):
         response = urlopen_mock.return_value
         response.__enter__.return_value.getcode.return_value = 200
+        response.__enter__.return_value.read.return_value = (
+            b'{"messages":[{"id":"wamid.pipeline-outbound"}]}'
+        )
 
         process_buffered_messages(
             tenant_id=tenant.pk,

@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 
+import pytest
 from django.test import override_settings
 from django.urls import reverse
 
@@ -18,6 +19,7 @@ def _signature_for(body):
 
 
 @override_settings(META_APP_SECRET=APP_SECRET)
+@pytest.mark.django_db
 def test_whatsapp_webhook_accepts_valid_signature(client, monkeypatch):
     body = b'{"object":"whatsapp_business_account"}'
 

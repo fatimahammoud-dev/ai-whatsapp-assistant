@@ -76,8 +76,7 @@ def test_process_buffered_messages_sends_plain_agent_reply(
     ]
 
     send_mock.assert_called_once_with(
-        conversation.tenant,
-        "96170123456",
+        conversation,
         "Thanks for your message. How can I help?",
     )
 
@@ -144,8 +143,7 @@ def test_process_buffered_messages_recognizes_tool_call(
     )
 
     send_mock.assert_called_once_with(
-        conversation.tenant,
-        "96170123456",
+        conversation,
         "Available appointment times: "
         "2026-01-15 09:00, "
         "2026-01-15 11:00, "
@@ -217,7 +215,6 @@ def test_process_buffered_messages_uses_openrouter_when_configured(
     respond_mock.assert_called_once()
 
     send_mock.assert_called_once_with(
-        conversation.tenant,
-        "96170123456",
+        conversation,
         "Reply from LLM.",
     )

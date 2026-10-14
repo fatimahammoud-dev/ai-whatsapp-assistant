@@ -191,7 +191,7 @@ def test_audio_webhook_transcribes_before_buffering(
         "transcribed",
         (
             "buffered",
-            "Je veux un rendez-vous demain",
+            message.pk,
         ),
     ]
 

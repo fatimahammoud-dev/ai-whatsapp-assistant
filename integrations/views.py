@@ -5,6 +5,7 @@ import logging
 from secrets import compare_digest
 
 from django.conf import settings
+from django.db import transaction
 from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
@@ -47,8 +48,27 @@ def _has_valid_whatsapp_signature(request):
 
 
 def _extract_whatsapp_message(payload):
-    value = payload["entry"][0]["changes"][0]["value"]
-    message = value["messages"][0]
+    entries = payload.get("entry") if isinstance(payload, dict) else None
+    if not isinstance(entries, list) or not entries or not isinstance(entries[0], dict):
+        raise ValueError("Invalid WhatsApp webhook entry")
+
+    changes = entries[0].get("changes")
+    if not isinstance(changes, list) or not changes or not isinstance(changes[0], dict):
+        raise ValueError("Invalid WhatsApp webhook changes")
+
+    value = changes[0].get("value")
+    if not isinstance(value, dict):
+        raise ValueError("Invalid WhatsApp webhook value")
+
+    messages = value.get("messages")
+    if (
+        not isinstance(messages, list)
+        or not messages
+        or not isinstance(messages[0], dict)
+    ):
+        raise ValueError("Invalid WhatsApp webhook messages")
+
+    message = messages[0]
 
     message_type = message["type"]
 
@@ -168,40 +188,40 @@ def whatsapp_webhook(request):
             KeyError,
             IndexError,
             TypeError,
+            ValueError,
         ):
             return HttpResponseBadRequest()
 
         if resolved_context is None:
             return HttpResponse(status=404)
 
-        message, created = _persist_inbound_message(
-            payload,
-            resolved_context,
-        )
-
-        if created:
-            message_content = message.content
-
-            if message.message_type == Message.MessageType.AUDIO:
-                try:
-                    message_content = transcribe_audio_message(
-                        message,
-                        resolved_context["tenant"],
-                    )
-                except AudioTranscriptionError:
-                    logger.exception(
-                        "Could not transcribe inbound WhatsApp audio "
-                        "message_id=%s tenant_id=%s",
-                        message.pk,
-                        resolved_context["tenant"].pk,
-                    )
-                    return HttpResponse(status=200)
-
-            buffer_inbound_message(
-                resolved_context["tenant"].pk,
-                resolved_context["end_user"].pk,
-                message_content,
+        with transaction.atomic():
+            message, created = _persist_inbound_message(
+                payload,
+                resolved_context,
             )
+
+            if created:
+                if message.message_type == Message.MessageType.AUDIO:
+                    try:
+                        transcribe_audio_message(
+                            message,
+                            resolved_context["tenant"],
+                        )
+                    except AudioTranscriptionError:
+                        logger.exception(
+                            "Could not transcribe inbound WhatsApp audio "
+                            "message_id=%s tenant_id=%s",
+                            message.pk,
+                            resolved_context["tenant"].pk,
+                        )
+                        return HttpResponse(status=200)
+
+                buffer_inbound_message(
+                    resolved_context["tenant"].pk,
+                    resolved_context["end_user"].pk,
+                    message.pk,
+                )
 
         return HttpResponse(status=200)
 
