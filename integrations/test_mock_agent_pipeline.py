@@ -1,8 +1,10 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 from integrations.agent.base import AgentResponse
 from integrations.tasks import process_buffered_messages
+from integrations.tools.availability import TimeSlot
 
 
 def _fake_conversation():
@@ -83,11 +85,32 @@ def test_process_buffered_messages_recognizes_tool_call(monkeypatch):
             tool_args={},
         )
     )
+
+    slots = [
+        TimeSlot(
+            start=datetime(2026, 1, 15, 9, 0),
+            end=datetime(2026, 1, 15, 9, 30),
+        ),
+        TimeSlot(
+            start=datetime(2026, 1, 15, 11, 0),
+            end=datetime(2026, 1, 15, 11, 30),
+        ),
+        TimeSlot(
+            start=datetime(2026, 1, 15, 14, 0),
+            end=datetime(2026, 1, 15, 14, 30),
+        ),
+    ]
+
+    dispatch_mock = Mock(return_value=slots)
     send_mock = Mock()
 
     monkeypatch.setattr(
         "integrations.tasks.MockAgent.respond",
         respond_mock,
+    )
+    monkeypatch.setattr(
+        "integrations.tasks.dispatch_tool",
+        dispatch_mock,
     )
     monkeypatch.setattr(
         "integrations.tasks.send_text_message",
@@ -101,6 +124,12 @@ def test_process_buffered_messages_recognizes_tool_call(monkeypatch):
     )
 
     respond_mock.assert_called_once()
+
+    dispatch_mock.assert_called_once_with(
+        "check_availability",
+        tenant=conversation.tenant,
+        date_range=None,
+    )
 
     send_mock.assert_called_once_with(
         conversation,

@@ -37,6 +37,25 @@ WHATSAPP_VERIFY_TOKEN = env("WHATSAPP_VERIFY_TOKEN", default="")
 # Meta App Secret used to verify WhatsApp webhook signatures.
 META_APP_SECRET = env("META_APP_SECRET", default="")
 
+GOOGLE_CALENDAR_CLIENT_ID = env("GOOGLE_CALENDAR_CLIENT_ID", default="")
+GOOGLE_CALENDAR_CLIENT_SECRET = env(
+    "GOOGLE_CALENDAR_CLIENT_SECRET",
+    default="",
+)
+
+MICROSOFT_CALENDAR_CLIENT_ID = env(
+    "MICROSOFT_CALENDAR_CLIENT_ID",
+    default="",
+)
+MICROSOFT_CALENDAR_CLIENT_SECRET = env(
+    "MICROSOFT_CALENDAR_CLIENT_SECRET",
+    default="",
+)
+MICROSOFT_CALENDAR_TENANT = env(
+    "MICROSOFT_CALENDAR_TENANT",
+    default="common",
+)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 
 
