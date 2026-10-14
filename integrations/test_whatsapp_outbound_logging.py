@@ -23,6 +23,9 @@ class FakeResponse:
     def getcode(self):
         return self.status
 
+    def read(self):
+        return b'{"messages":[{"id":"wamid.test-outbound"}]}'
+
     def __enter__(self):
         return self
 
@@ -76,8 +79,7 @@ def test_successful_send_logs_outbound_message_in_conversation_order(
         return_value=FakeResponse(200),
     ):
         result = send_text_message(
-            tenant,
-            RECIPIENT,
+            conversation,
             "Hello, how can I help?",
         )
 
@@ -97,6 +99,7 @@ def test_successful_send_logs_outbound_message_in_conversation_order(
     assert messages[1].direction == Message.Direction.OUTBOUND
     assert messages[1].message_type == Message.MessageType.TEXT
     assert messages[1].content == "Hello, how can I help?"
+    assert messages[1].whatsapp_message_id == "wamid.test-outbound"
 
 
 @pytest.mark.django_db
@@ -126,8 +129,7 @@ def test_failed_send_is_not_logged_as_outbound_message(
             logger="integrations.whatsapp",
         ):
             result = send_text_message(
-                tenant,
-                RECIPIENT,
+                conversation,
                 "This message should not be logged",
             )
 
@@ -142,3 +144,37 @@ def test_failed_send_is_not_logged_as_outbound_message(
     )
 
     assert "status=400" in caplog.text
+
+
+@pytest.mark.django_db
+def test_reply_stays_in_given_conversation_when_two_are_active(
+    conversation,
+):
+    newer_conversation = Conversation.objects.create(
+        tenant=conversation.tenant,
+        end_user=conversation.end_user,
+        status=Conversation.Status.ACTIVE,
+    )
+
+    with patch(
+        "integrations.whatsapp.urlopen",
+        return_value=FakeResponse(200),
+    ):
+        result = send_text_message(
+            conversation,
+            "Reply to original conversation",
+        )
+
+    assert result is True
+    assert (
+        Message.objects.filter(
+            conversation=conversation,
+            direction=Message.Direction.OUTBOUND,
+        ).count()
+        == 1
+    )
+
+    assert not Message.objects.filter(
+        conversation=newer_conversation,
+        direction=Message.Direction.OUTBOUND,
+    ).exists()
