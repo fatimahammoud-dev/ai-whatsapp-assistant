@@ -6,7 +6,7 @@ from celery import shared_task
 from django.conf import settings
 from redis import Redis
 
-from conversations.models import Conversation
+from conversations.models import Conversation, Message
 from integrations.agent.mock import MockAgent
 from integrations.tools.dispatcher import dispatch_tool
 from integrations.whatsapp import send_text_message
@@ -14,6 +14,7 @@ from integrations.whatsapp import send_text_message
 logger = logging.getLogger(__name__)
 
 DEBOUNCE_SECONDS = 5
+BUFFER_TTL_SECONDS = 3600
 
 _DRAIN_BUFFER_SCRIPT = """
 local current_timestamp = redis.call("GET", KEYS[2])
@@ -85,8 +86,7 @@ def process_buffered_messages(
 
     if response.action == "reply":
         send_text_message(
-            conversation.tenant,
-            conversation.end_user.phone_number,
+            conversation,
             response.text,
         )
         return
@@ -118,8 +118,7 @@ def process_buffered_messages(
             reply_text = str(result)
 
         send_text_message(
-            conversation.tenant,
-            conversation.end_user.phone_number,
+            conversation,
             reply_text,
         )
 
@@ -127,7 +126,7 @@ def process_buffered_messages(
 def buffer_inbound_message(
     tenant_id,
     end_user_id,
-    message_content,
+    message_id,
 ):
     scheduled_at = time.time_ns()
 
@@ -136,11 +135,19 @@ def buffer_inbound_message(
     with client.pipeline(transaction=True) as pipeline:
         pipeline.rpush(
             _buffer_key(tenant_id, end_user_id),
-            message_content,
+            str(message_id),
         )
         pipeline.set(
             _last_message_key(tenant_id, end_user_id),
             str(scheduled_at),
+        )
+        pipeline.expire(
+            _buffer_key(tenant_id, end_user_id),
+            BUFFER_TTL_SECONDS,
+        )
+        pipeline.expire(
+            _last_message_key(tenant_id, end_user_id),
+            BUFFER_TTL_SECONDS,
         )
         pipeline.execute()
 
@@ -169,7 +176,14 @@ def debounce_buffer_task(
     if not messages:
         return
 
-    concatenated_messages = "\n".join(messages)
+    message_ids = [int(raw_id) for raw_id in messages]
+    saved_messages = Message.objects.in_bulk(message_ids)
+
+    concatenated_messages = "\n".join(
+        saved_messages[message_id].content
+        for message_id in message_ids
+        if message_id in saved_messages
+    )
 
     process_buffered_messages(
         tenant_id,

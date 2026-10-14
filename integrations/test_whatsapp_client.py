@@ -5,6 +5,7 @@ from urllib.error import HTTPError
 
 import pytest
 
+from conversations.models import Conversation, EndUser
 from integrations.whatsapp import (
     GRAPH_API_VERSION,
     send_text_message,
@@ -22,6 +23,9 @@ class FakeResponse:
 
     def getcode(self):
         return self.status
+
+    def read(self):
+        return b'{"messages":[{"id":"wamid.test-outbound"}]}'
 
     def __enter__(self):
         return self
@@ -44,17 +48,30 @@ def tenant(db):
     return tenant
 
 
+@pytest.fixture
+def conversation(tenant):
+    end_user = EndUser.objects.create(
+        tenant=tenant,
+        phone_number=RECIPIENT,
+    )
+    return Conversation.objects.create(
+        tenant=tenant,
+        end_user=end_user,
+        status=Conversation.Status.ACTIVE,
+    )
+
+
 @pytest.mark.django_db
 def test_send_text_message_uses_expected_cloud_api_request(
     tenant,
+    conversation,
 ):
     with patch(
         "integrations.whatsapp.urlopen",
         return_value=FakeResponse(200),
     ) as urlopen_mock:
         result = send_text_message(
-            tenant,
-            RECIPIENT,
+            conversation,
             "Hello from the assistant",
         )
 
@@ -91,6 +108,7 @@ def test_send_text_message_uses_expected_cloud_api_request(
 @pytest.mark.django_db
 def test_send_text_message_handles_non_2xx_without_raising(
     tenant,
+    conversation,
     caplog,
 ):
     api_error = HTTPError(
@@ -114,8 +132,7 @@ def test_send_text_message_handles_non_2xx_without_raising(
             logger="integrations.whatsapp",
         ):
             result = send_text_message(
-                tenant,
-                RECIPIENT,
+                conversation,
                 "This request will fail",
             )
 

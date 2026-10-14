@@ -111,5 +111,96 @@ def test_webhook_persists_message_buffers_processing_and_returns_200(
     buffer_mock.assert_called_once_with(
         tenant.pk,
         message.conversation.end_user_id,
-        "Hello from Ticket 8",
+        message.pk,
+    )
+
+
+@pytest.mark.django_db
+@override_settings(META_APP_SECRET=APP_SECRET)
+def test_audio_with_empty_content_is_buffered_by_message_id(
+    client,
+    tenant,
+    inbound_payload,
+):
+    payload = json.loads(json.dumps(inbound_payload))
+    message_data = payload["entry"][0]["changes"][0]["value"]["messages"][0]
+    message_data["id"] = "wamid.ticket-8-audio"
+    message_data["type"] = "audio"
+    message_data.pop("text", None)
+
+    body = json.dumps(payload).encode("utf-8")
+
+    with patch("integrations.views.buffer_inbound_message") as buffer_mock:
+        response = client.generic(
+            "POST",
+            reverse("whatsapp-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_HUB_SIGNATURE_256=_signature_for(body),
+        )
+
+    assert response.status_code == 200
+
+    saved = Message.objects.get(
+        whatsapp_message_id="wamid.ticket-8-audio",
+    )
+    assert saved.content == ""
+
+    buffer_mock.assert_called_once_with(
+        tenant.pk,
+        saved.conversation.end_user_id,
+        saved.pk,
+    )
+
+
+@pytest.mark.django_db
+@override_settings(META_APP_SECRET=APP_SECRET)
+def test_buffer_failure_rolls_back_message_and_retry_succeeds(
+    client,
+    tenant,
+    inbound_payload,
+):
+    body = json.dumps(inbound_payload).encode("utf-8")
+    signature = _signature_for(body)
+
+    client.raise_request_exception = False
+
+    with patch(
+        "integrations.views.buffer_inbound_message",
+        side_effect=ConnectionError("Redis unavailable"),
+    ) as failed_buffer:
+        failed_response = client.generic(
+            "POST",
+            reverse("whatsapp-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_HUB_SIGNATURE_256=signature,
+        )
+
+    assert failed_response.status_code == 500
+    failed_buffer.assert_called_once()
+
+    assert not Message.objects.filter(
+        whatsapp_message_id=MESSAGE_ID,
+    ).exists()
+
+    with patch("integrations.views.buffer_inbound_message") as retry_buffer:
+        retry_response = client.generic(
+            "POST",
+            reverse("whatsapp-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_HUB_SIGNATURE_256=signature,
+        )
+
+    assert retry_response.status_code == 200
+
+    saved_message = Message.objects.get(
+        whatsapp_message_id=MESSAGE_ID,
+    )
+
+    retry_buffer.assert_called_once_with(
+        tenant.pk,
+        saved_message.conversation.end_user_id,
+        saved_message.pk,
     )
