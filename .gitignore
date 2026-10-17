@@ -8,3 +8,7 @@ db.sqlite3
 staticfiles
 .ruff_cache
 .pytest_cache
+
+# Sprint 9 Tailwind build artifacts
+/node_modules/
+/accounts/static/staff/staff.css

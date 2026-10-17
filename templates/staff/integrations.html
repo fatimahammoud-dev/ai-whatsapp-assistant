@@ -1,0 +1,98 @@
+{% extends "staff/base.html" %}
+
+{% block title %}Integrations{% endblock %}
+
+{% block content %}
+<div class="mb-9">
+    <p class="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-[#527a65]">
+        CONNECTED SERVICES
+    </p>
+    <h1 class="text-3xl font-extrabold tracking-tight text-[#242b29] sm:text-4xl">
+        Integrations
+    </h1>
+    <p class="mt-3 max-w-2xl text-sm leading-7 text-[#66746b]">
+        Review the calendar connection status for your business.
+    </p>
+</div>
+
+<div class="grid gap-6 md:grid-cols-2">
+    <section class="staff-card p-7">
+        <div class="mb-7 flex items-start justify-between gap-4">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f5f6f2] text-2xl font-extrabold text-[#4285f4]">
+                G
+            </span>
+            {% if connected_provider == google_provider %}
+                <span class="rounded-full bg-[#e5f3e9] px-4 py-2 text-xs font-bold text-[#276744]">
+                    Connected
+                </span>
+            {% else %}
+                <span class="rounded-full bg-[#f0f1ee] px-4 py-2 text-xs font-bold text-[#68736b]">
+                    Not connected
+                </span>
+            {% endif %}
+        </div>
+
+        <h2 class="text-xl font-extrabold text-[#242b29]">Google Calendar</h2>
+        <p class="mt-3 min-h-16 text-sm leading-7 text-[#66746b]">
+            Calendar availability and appointment synchronization through Google.
+        </p>
+
+        <div class="mt-6 border-t border-[#edf0eb] pt-6">
+            <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
+                  aria-disabled="true">
+                Connect Google
+                <span class="text-xs font-medium">Coming soon</span>
+            </span>
+        </div>
+    </section>
+
+    <section class="staff-card p-7">
+        <div class="mb-7 flex items-start justify-between gap-4">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#edf1f8] text-2xl font-extrabold text-[#2468a7]">
+                O
+            </span>
+            {% if connected_provider == outlook_provider %}
+                <span class="rounded-full bg-[#e5f3e9] px-4 py-2 text-xs font-bold text-[#276744]">
+                    Connected
+                </span>
+            {% else %}
+                <span class="rounded-full bg-[#f0f1ee] px-4 py-2 text-xs font-bold text-[#68736b]">
+                    Not connected
+                </span>
+            {% endif %}
+        </div>
+
+        <h2 class="text-xl font-extrabold text-[#242b29]">Microsoft Outlook</h2>
+        <p class="mt-3 min-h-16 text-sm leading-7 text-[#66746b]">
+            Calendar availability and appointment synchronization through Microsoft.
+        </p>
+
+        <div class="mt-6 border-t border-[#edf0eb] pt-6">
+            <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
+                  aria-disabled="true">
+                Connect Outlook
+                <span class="text-xs font-medium">Coming soon</span>
+            </span>
+        </div>
+    </section>
+</div>
+
+<div class="mt-7 rounded-2xl border border-[#dce7dc] bg-[#eaf2e9] p-6">
+    <div class="flex items-start gap-4">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[#24513d]">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 11v5M12 7h.01"/>
+            </svg>
+        </span>
+        <div>
+            <h2 class="font-extrabold text-[#24513d]">How calendar integrations work</h2>
+            <p class="mt-2 text-sm leading-7 text-[#4f6d59]">
+                This page currently shows connection status only.
+                Google and Microsoft authorization will be added in the next implementation step.
+                The connection controls are intentionally unavailable until then.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

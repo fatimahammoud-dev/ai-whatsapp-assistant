@@ -7,12 +7,17 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from accounts.views import dashboard_home
+from accounts.views import dashboard_home, staff_integrations
 from bookings.views import BookingListView
 from core.views import healthcheck
 from integrations.views import whatsapp_webhook
 
 urlpatterns = [
+    path(
+        "integrations/",
+        staff_integrations,
+        name="staff-integrations",
+    ),
     path(
         "",
         RedirectView.as_view(pattern_name="dashboard", permanent=False),
