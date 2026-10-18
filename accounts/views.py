@@ -47,5 +47,8 @@ def staff_integrations(request):
             "connected_provider": connected_provider,
             "google_provider": Tenant.CalendarProvider.GOOGLE,
             "outlook_provider": Tenant.CalendarProvider.OUTLOOK,
+            "can_manage_calendar": (
+                request.user.role == "owner" and request.user.tenant_id is not None
+            ),
         },
     )

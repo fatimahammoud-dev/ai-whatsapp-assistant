@@ -38,11 +38,20 @@
         </p>
 
         <div class="mt-6 border-t border-[#edf0eb] pt-6">
-            <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
-                  aria-disabled="true">
-                Connect Google
-                <span class="text-xs font-medium">Coming soon</span>
-            </span>
+            {% if can_manage_calendar %}
+                <form method="post" action="{% url 'calendar-oauth-connect' provider=google_provider %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-xl bg-[#24513d] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#193d2d]">
+                        {% if connected_provider == google_provider %}Reconnect Google{% else %}Connect Google{% endif %}
+                    </button>
+                </form>
+            {% else %}
+                <span class="inline-flex cursor-not-allowed items-center rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
+                      aria-disabled="true">
+                    Owner access required
+                </span>
+            {% endif %}
         </div>
     </section>
 
@@ -68,11 +77,20 @@
         </p>
 
         <div class="mt-6 border-t border-[#edf0eb] pt-6">
-            <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
-                  aria-disabled="true">
-                Connect Outlook
-                <span class="text-xs font-medium">Coming soon</span>
-            </span>
+            {% if can_manage_calendar %}
+                <form method="post" action="{% url 'calendar-oauth-connect' provider=outlook_provider %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-xl bg-[#24513d] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#193d2d]">
+                        {% if connected_provider == outlook_provider %}Reconnect Outlook{% else %}Connect Outlook{% endif %}
+                    </button>
+                </form>
+            {% else %}
+                <span class="inline-flex cursor-not-allowed items-center rounded-xl bg-[#f0f1ee] px-5 py-3 text-sm font-bold text-[#68736b]"
+                      aria-disabled="true">
+                    Owner access required
+                </span>
+            {% endif %}
         </div>
     </section>
 </div>
@@ -88,9 +106,9 @@
         <div>
             <h2 class="font-extrabold text-[#24513d]">How calendar integrations work</h2>
             <p class="mt-2 text-sm leading-7 text-[#4f6d59]">
-                This page currently shows connection status only.
-                Google and Microsoft authorization will be added in the next implementation step.
-                The connection controls are intentionally unavailable until then.
+                Business owners can securely connect Google Calendar or Microsoft Outlook.
+                Authorization happens directly with the selected provider.
+                Staff members can review connection status without changing it.
             </p>
         </div>
     </div>
