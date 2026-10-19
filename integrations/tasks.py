@@ -15,9 +15,11 @@ from integrations.booking_flow import (
     date_range_for_date,
     filter_slots_by_time_preference,
     merge_pending_state,
+    next_availability_range,
     parse_slot,
     pending_updates_from_tool,
     resolve_service,
+    select_offered_slots,
     serialize_slots,
     slot_was_offered,
 )
@@ -160,13 +162,25 @@ def process_buffered_messages(
             awaiting=True,
         )
 
-        date_text = tool_args.get("date") or state.get("date")
+        explicit_date = tool_args.get("date")
+        date_text = explicit_date or state.get("date")
+
+        next_range = None
+        if tool_args.get("next_options") and not explicit_date:
+            last_date = state.get("search_cursor_date") or state.get(
+                "last_offered_date"
+            )
+            if last_date:
+                next_range = next_availability_range(
+                    conversation.tenant,
+                    last_date,
+                )
         time_preference = (
             tool_args.get("time_preference") or state.get("time_preference") or "any"
         )
         service_name = tool_args.get("service_name") or state.get("service_name")
 
-        date_range = (
+        date_range = next_range or (
             date_range_for_date(
                 conversation.tenant,
                 date_text,
@@ -199,6 +213,11 @@ def process_buffered_messages(
             time_preference,
         )
 
+        result, last_offered_date = select_offered_slots(
+            result,
+            conversation.tenant,
+        )
+
         offered_slots = serialize_slots(result)
 
         merge_pending_state(
@@ -209,12 +228,77 @@ def process_buffered_messages(
             awaiting=True,
         )
 
+        # None must clear the previous pagination cursor.
+        current_state = dict(conversation.pending_intent_state or {})
+        current_state["last_offered_date"] = last_offered_date
+        if last_offered_date:
+            current_state["search_cursor_date"] = last_offered_date
+        elif date_range is not None:
+            from datetime import timedelta
+            from zoneinfo import ZoneInfo
+
+            tenant_tz = ZoneInfo(conversation.tenant.timezone)
+            searched_last_day = date_range.end.astimezone(tenant_tz).date() - timedelta(
+                days=1
+            )
+            current_state["search_cursor_date"] = searched_last_day.isoformat()
+        else:
+            current_state.pop("search_cursor_date", None)
+        conversation.pending_intent_state = current_state
+        conversation.save(update_fields=["pending_intent_state"])
+
         if result:
             reply_text = "Available appointment times: " + ", ".join(
                 slot.start.strftime("%Y-%m-%d %H:%M") for slot in result
             )
         else:
             reply_text = "No appointment times are available for that request."
+
+        if settings.AGENT_BACKEND == "openrouter":
+            try:
+                formatter = OpenRouterAgent()
+                intro = formatter.format_tool_result(
+                    conversation=conversation,
+                    tool_name="check_availability",
+                    new_messages=messages,
+                    tool_result={
+                        "available_slots": offered_slots,
+                        "last_offered_date": last_offered_date,
+                    },
+                )
+
+                # Only approved phrases may reach the customer.
+                # Slot dates/times always come from verified backend results.
+                approved = {
+                    "Here are the available appointment times:",
+                    "I found these available appointment times:",
+                    "Voici les cr?neaux disponibles :",
+                    "Voici les horaires disponibles :",
+                    "??? ???????? ???????:",
+                    "?????? ????????? ???????:",
+                }
+                approved_empty = {
+                    "No appointment times are available for that request.",
+                    "Aucun cr?neau n'est disponible pour cette demande.",
+                    "?? ?? ?????? ????? ???????.",
+                }
+
+                if result and intro.strip() in approved:
+                    verified_slots = ", ".join(
+                        slot.start.strftime("%Y-%m-%d %H:%M") for slot in result
+                    )
+                    reply_text = intro.strip() + "\\n" + verified_slots
+                elif not result and intro.strip() in approved_empty:
+                    reply_text = intro.strip()
+
+            except Exception:
+                logger.exception(
+                    "Failed to format availability result with OpenRouter "
+                    "tenant_id=%s conversation_id=%s",
+                    tenant_id,
+                    conversation.pk,
+                )
+                # Keep the backend-generated availability reply.
 
         send_text_message(
             conversation,

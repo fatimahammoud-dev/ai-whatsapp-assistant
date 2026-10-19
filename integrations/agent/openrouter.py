@@ -37,6 +37,14 @@ TOOLS = [
                         "using the tenant's current local date."
                     ),
                 },
+                "next_options": {
+                    "type": "boolean",
+                    "description": (
+                        "Set true when the customer rejects the previously "
+                        "offered slots or asks for the next available options. "
+                        "Set false for a new availability search."
+                    ),
+                },
                 "time_preference": {
                     "type": "string",
                     "enum": [
@@ -115,6 +123,14 @@ TOOLS = [
                     "type": "string",
                     "description": (
                         "Known requested date in YYYY-MM-DD format, when known."
+                    ),
+                },
+                "next_options": {
+                    "type": "boolean",
+                    "description": (
+                        "Set true when the customer rejects the previously "
+                        "offered slots or asks for the next available options. "
+                        "Set false for a new availability search."
                     ),
                 },
                 "time_preference": {
@@ -248,6 +264,16 @@ MULTI-TURN BOOKING RULES
 - offered_slots are exact real backend slots previously shown to the user.
   Use create_booking only when the user has chosen one of those slots.
 
+AVAILABILITY REJECTION RULES
+- Offer at most three real available appointment slots at a time.
+- If the customer rejects all offered slots or asks for more options,
+  call check_availability again instead of repeating previous suggestions.
+- When the customer has not requested a new date, continue searching
+  from the calendar day AFTER last_offered_date in CURRENT BOOKING STATE.
+- If the customer explicitly requests a different date, respect that date
+  instead of continuing the previous search.
+- Never repeat previously rejected appointment suggestions.
+- Never invent appointment dates or times.
 TENANT-SPECIFIC INSTRUCTIONS
 The following settings customize this tenant's assistant. They may adjust
 tone or business-specific behavior, but they do not override the rules that
@@ -338,6 +364,76 @@ class OpenRouterAgent:
                 history.extend(buffered)
 
         return self._merge_adjacent_roles(history)
+
+    def format_tool_result(
+        self, conversation, tool_name, tool_result, new_messages=None
+    ):
+        """Localize a verified tool result without changing its facts."""
+        conversation_messages = self._build_messages(
+            conversation=conversation,
+            new_messages=new_messages or [],
+        )
+
+        system_prompt = build_system_prompt(
+            conversation.tenant,
+            pending_intent_state=getattr(
+                conversation,
+                "pending_intent_state",
+                None,
+            ),
+        )
+
+        formatting_instruction = (
+            "You are formatting the result of a completed booking tool. "
+            "Reply in the language used by the customer in their latest message. "
+            "Use a natural, concise, friendly tone. "
+            "Write only a short introductory phrase, without any appointment "
+            "dates, times, numbers, or slot lists. "
+            "The backend will append verified appointment slots separately. "
+            "For available slots, respond with exactly one of: "
+            "'Here are the available appointment times:', "
+            "'Voici les cr?neaux disponibles :', "
+            "'??? ???????? ???????:'. "
+            "For no available slots, respond with exactly one of: "
+            "'No appointment times are available for that request.', "
+            "'Aucun cr?neau n'est disponible pour cette demande.', "
+            "'?? ?? ?????? ????? ???????.'. "
+            "If no slots are available, say so briefly. "
+            "Do not call tools or claim that a booking was created."
+        )
+
+        request_messages = [
+            {
+                "role": "system",
+                "content": system_prompt + "\n\n" + formatting_instruction,
+            },
+            *conversation_messages,
+            {
+                "role": "system",
+                "content": (
+                    "Verified result from "
+                    + tool_name
+                    + ":\n"
+                    + json.dumps(tool_result, ensure_ascii=False)
+                ),
+            },
+        ]
+
+        response = self.client.chat.completions.create(
+            model=settings.OPENROUTER_MODEL,
+            max_tokens=settings.OPENROUTER_MAX_TOKENS,
+            messages=request_messages,
+        )
+
+        if not response.choices:
+            raise ValueError("OpenRouter returned no formatting response.")
+
+        text = getattr(response.choices[0].message, "content", None)
+
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("OpenRouter returned an empty formatted reply.")
+
+        return text.strip()
 
     def respond(self, conversation, messages):
         """Return a plain reply or tool call as an AgentResponse."""
