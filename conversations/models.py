@@ -45,6 +45,11 @@ class Conversation(models.Model):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
+    memory_summary = models.TextField(blank=True)
+    memory_last_summarized_message_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+    )
     pending_intent_state = models.JSONField(default=dict)
     assigned_staff = models.ForeignKey(
         "accounts.StaffUser",

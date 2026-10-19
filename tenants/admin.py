@@ -11,6 +11,7 @@ class TenantAdmin(admin.ModelAdmin):
         "vertical",
         "calendar_provider",
         "subscription_tier",
+        "memory_enabled",
         "is_active",
         "created_at",
     )
