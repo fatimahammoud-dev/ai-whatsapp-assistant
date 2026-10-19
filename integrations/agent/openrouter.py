@@ -6,10 +6,17 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    InternalServerError,
+    OpenAI,
+    RateLimitError,
+)
 
 from conversations.models import Message
 from integrations.agent.base import AgentResponse
+from integrations.retry import retry_call
 
 TOOLS = [
     {
@@ -304,6 +311,22 @@ class OpenRouterAgent:
         self.client = OpenAI(
             base_url=settings.OPENROUTER_BASE_URL,
             api_key=settings.OPENROUTER_API_KEY,
+            max_retries=0,
+        )
+
+    def _chat_completion(self, **kwargs):
+        return retry_call(
+            lambda: self.client.chat.completions.create(**kwargs),
+            should_retry=lambda exc: isinstance(
+                exc,
+                (
+                    RateLimitError,
+                    InternalServerError,
+                    APIConnectionError,
+                    APITimeoutError,
+                ),
+            ),
+            operation_name="openrouter_chat",
         )
 
     @staticmethod
@@ -419,7 +442,7 @@ class OpenRouterAgent:
             },
         ]
 
-        response = self.client.chat.completions.create(
+        response = self._chat_completion(
             model=settings.OPENROUTER_MODEL,
             max_tokens=settings.OPENROUTER_MAX_TOKENS,
             messages=request_messages,
@@ -457,7 +480,7 @@ class OpenRouterAgent:
             *conversation_messages,
         ]
 
-        response = self.client.chat.completions.create(
+        response = self._chat_completion(
             model=settings.OPENROUTER_MODEL,
             max_tokens=settings.OPENROUTER_MAX_TOKENS,
             messages=request_messages,

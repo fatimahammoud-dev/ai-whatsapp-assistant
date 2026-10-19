@@ -9,7 +9,7 @@ from integrations.tools.availability import TimeSlot
 
 def _fake_conversation():
     return SimpleNamespace(
-        tenant=SimpleNamespace(pk=101),
+        tenant=SimpleNamespace(pk=101, timezone="UTC"),
         end_user=SimpleNamespace(
             pk=202,
             phone_number="96170123456",

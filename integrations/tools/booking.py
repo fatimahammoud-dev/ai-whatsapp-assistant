@@ -1,4 +1,4 @@
-﻿"""Booking creation tool used by the conversational agent pipeline."""
+"""Booking creation tool used by the conversational agent pipeline."""
 
 import logging
 
@@ -55,11 +55,22 @@ def _sync_external_calendar(booking, tenant, slot, service) -> None:
     summary = service.name if service is not None else "Appointment"
 
     try:
-        external_event_id = provider.create_event(
-            connection,
-            slot,
-            summary,
-        )
+        from integrations.calendar.google import GoogleCalendarProvider
+        from integrations.calendar.outlook import OutlookCalendarProvider
+
+        if isinstance(provider, (GoogleCalendarProvider, OutlookCalendarProvider)):
+            external_event_id = provider.create_event(
+                connection,
+                slot,
+                summary,
+                idempotency_key=f"booking-{booking.pk}",
+            )
+        else:
+            external_event_id = provider.create_event(
+                connection,
+                slot,
+                summary,
+            )
     except CalendarProviderError:
         logger.exception(
             "External calendar event creation failed " "booking_id=%s tenant_id=%s",

@@ -1,5 +1,7 @@
-﻿"""Google Calendar provider."""
+"""Google Calendar provider."""
 
+import hashlib
+from urllib.error import HTTPError
 from urllib.parse import quote
 
 from django.conf import settings
@@ -71,20 +73,67 @@ class GoogleCalendarProvider(CalendarProvider):
             for interval in calendar_data.get("busy", [])
         ]
 
-    def create_event(self, connection, slot, summary) -> str:
+    def create_event(self, connection, slot, summary, *, idempotency_key=None) -> str:
         token = self.access_token(connection)
         calendar_id = quote(connection.external_calendar_id, safe="")
 
-        payload = request_json(
-            f"{GOOGLE_CALENDAR_BASE_URL}/{calendar_id}/events",
-            method="POST",
-            access_token=token,
-            payload={
-                "summary": summary,
-                "start": {"dateTime": slot.start.isoformat()},
-                "end": {"dateTime": slot.end.isoformat()},
-            },
-        )
+        event_payload = {
+            "summary": summary,
+            "start": {"dateTime": slot.start.isoformat()},
+            "end": {"dateTime": slot.end.isoformat()},
+        }
+
+        if idempotency_key is not None:
+            event_payload["id"] = hashlib.sha256(
+                str(idempotency_key).encode("utf-8")
+            ).hexdigest()[:32]
+
+        events_url = f"{GOOGLE_CALENDAR_BASE_URL}/{calendar_id}/events"
+
+        try:
+            if idempotency_key is None:
+                payload = request_json(
+                    events_url,
+                    method="POST",
+                    access_token=token,
+                    payload=event_payload,
+                )
+            else:
+                payload = request_json(
+                    events_url,
+                    method="POST",
+                    access_token=token,
+                    payload=event_payload,
+                    retry_safe=True,
+                )
+        except CalendarProviderError as exc:
+            cause = exc.__cause__
+            if (
+                idempotency_key is None
+                or not isinstance(cause, HTTPError)
+                or cause.code != 409
+            ):
+                raise
+
+            expected_id = event_payload["id"]
+            existing = request_json(
+                f"{events_url}/{quote(expected_id, safe='')}",
+                access_token=token,
+            )
+
+            if (
+                existing.get("id") != expected_id
+                or existing.get("summary") != event_payload["summary"]
+                or existing.get("start", {}).get("dateTime")
+                != event_payload["start"]["dateTime"]
+                or existing.get("end", {}).get("dateTime")
+                != event_payload["end"]["dateTime"]
+            ):
+                raise CalendarProviderError(
+                    "Conflicting Google event did not match the booking."
+                ) from exc
+
+            return expected_id
 
         event_id = payload.get("id")
         if not event_id:
