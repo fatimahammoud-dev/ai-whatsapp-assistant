@@ -12,3 +12,7 @@ db.sqlite3
 .coverage
 htmlcov
 staticfiles
+
+# Sprint 9 Tailwind build artifacts
+node_modules/
+accounts/static/staff/staff.css

@@ -1,4 +1,4 @@
-﻿"""Shared calendar provider abstractions."""
+"""Shared calendar provider abstractions."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -85,5 +85,5 @@ class CalendarProvider(ABC):
         """Return provider busy intervals for the requested range."""
 
     @abstractmethod
-    def create_event(self, connection, slot, summary) -> str:
+    def create_event(self, connection, slot, summary, *, idempotency_key=None) -> str:
         """Create an external event and return its provider event ID."""

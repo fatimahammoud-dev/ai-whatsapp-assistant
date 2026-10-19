@@ -1,3 +1,15 @@
+FROM node:22-bookworm-slim AS assets-builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY assets/css/staff.css ./assets/css/staff.css
+COPY templates ./templates
+
+RUN npm run build:css
+
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
@@ -18,6 +30,7 @@ RUN addgroup --system appgroup \
 
 COPY --from=builder /install /usr/local
 COPY . .
+COPY --from=assets-builder /app/accounts/static/staff/staff.css /app/accounts/static/staff/staff.css
 
 ENV HOME=/home/appuser
 ENV PYTHONDONTWRITEBYTECODE=1

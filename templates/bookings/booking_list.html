@@ -1,24 +1,115 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Bookings</title>
-</head>
-<body>
-    <h1>Bookings</h1>
+{% extends "staff/base.html" %}
 
-    <ul>
-        {% for booking in bookings %}
-            <li>
-                {{ booking.tenant.business_name }}
-                —
-                {{ booking.scheduled_start }}
-                —
-                {{ booking.status }}
-            </li>
-        {% empty %}
-            <li>No bookings found.</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+{% block title %}Bookings{% endblock %}
+
+{% block content %}
+
+<div class="mb-9 flex flex-wrap items-end justify-between gap-4">
+    <div>
+        <p class="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-[#527a65]">
+            APPOINTMENT MANAGEMENT
+        </p>
+        <h1 class="text-3xl font-extrabold tracking-tight text-[#242b29] sm:text-4xl">
+            Bookings
+        </h1>
+        <p class="mt-3 max-w-2xl text-sm leading-7 text-[#66746b]">
+            View appointment records and track booking statuses for your business.
+        </p>
+    </div>
+    <span class="rounded-full border border-[#d9e5d9] bg-[#eaf2e9] px-4 py-2 text-xs font-bold text-[#24513d]">
+        Appointment records
+    </span>
+</div>
+
+<div class="staff-card overflow-hidden">
+
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#edf0eb] px-6 py-6">
+        <div>
+            <h2 class="text-lg font-extrabold text-[#242b29]">All bookings</h2>
+            <p class="mt-2 text-sm text-[#66746b]">
+                Appointments associated with your workspace.
+            </p>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[650px] text-left text-sm">
+            <thead class="bg-[#f7f8f5] text-xs uppercase tracking-wider text-[#66746b]">
+                <tr>
+                    <th scope="col" class="px-6 py-4 font-bold">Business</th>
+                    <th scope="col" class="px-6 py-4 font-bold">Appointment date</th>
+                    <th scope="col" class="px-6 py-4 font-bold">Status</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-[#edf0eb]">
+                {% for booking in bookings %}
+                    <tr class="transition hover:bg-[#fafbf8]">
+                        <td class="px-6 py-5">
+                            <span class="font-bold text-[#242b29]">
+                                {{ booking.tenant.business_name }}
+                            </span>
+                        </td>
+
+                        <td class="px-6 py-5 font-medium text-[#4f6156]">
+                            {{ booking.scheduled_start|date:"M d, Y - H:i" }}
+                        </td>
+
+                        <td class="px-6 py-5">
+                            {% if booking.status == "confirmed" %}
+                                <span class="inline-flex rounded-full bg-[#e5f3e9] px-3 py-1.5 text-xs font-bold text-[#276744]">
+                                    Confirmed
+                                </span>
+                            {% elif booking.status == "cancelled" or booking.status == "canceled" %}
+                                <span class="inline-flex rounded-full bg-[#fce9e6] px-3 py-1.5 text-xs font-bold text-[#a64a3e]">
+                                    Cancelled
+                                </span>
+                            {% else %}
+                                <span class="inline-flex rounded-full bg-[#f3efe2] px-3 py-1.5 text-xs font-bold text-[#806d37]">
+                                    {{ booking.get_status_display }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="px-6 py-16 text-center">
+                            <span class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eaf2e9] text-[#24513d]">
+                                <svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                                    <path d="M7 3v4M17 3v4M3 10h18"/>
+                                </svg>
+                            </span>
+                            <h3 class="text-base font-extrabold text-[#242b29]">No bookings found</h3>
+                            <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#66746b]">
+                                Booking records will appear here when appointments are available.
+                            </p>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div class="mt-6 rounded-2xl border border-[#dce7dc] bg-[#eaf2e9] p-5">
+    <div class="flex items-start gap-4">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#24513d]">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 11v5M12 7h.01"/>
+            </svg>
+        </span>
+        <div>
+            <h2 class="font-extrabold text-[#24513d]">How bookings work</h2>
+            <p class="mt-2 text-sm leading-6 text-[#4f6d59]">
+                This page displays existing appointment records.
+                Booking availability and calendar connections are managed
+                through the configured system integrations.
+            </p>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

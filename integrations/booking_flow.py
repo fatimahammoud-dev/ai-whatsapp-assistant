@@ -171,3 +171,37 @@ def slot_was_offered(slot, offered_slots):
             return True
 
     return False
+
+
+MAX_OFFERED_SLOTS = 3
+
+
+def select_offered_slots(slots, tenant):
+    """Select up to three earliest slots and track the last offered day."""
+    ordered_slots = sorted(slots, key=lambda slot: slot.start)
+    offered = ordered_slots[:MAX_OFFERED_SLOTS]
+
+    if not offered:
+        return [], None
+
+    tenant_timezone = ZoneInfo(tenant.timezone)
+    last_offered_date = offered[-1].start.astimezone(tenant_timezone).date().isoformat()
+
+    return offered, last_offered_date
+
+
+def next_availability_range(tenant, last_offered_date, days=7):
+    """Search a bounded block of days after the last offered day."""
+    start_date = date.fromisoformat(last_offered_date) + timedelta(days=1)
+    tenant_timezone = ZoneInfo(tenant.timezone)
+
+    start = datetime.combine(
+        start_date,
+        time.min,
+        tzinfo=tenant_timezone,
+    )
+
+    return TimeSlot(
+        start=start,
+        end=start + timedelta(days=days),
+    )

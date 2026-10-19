@@ -51,6 +51,10 @@ class Tenant(models.Model):
     )
     monthly_conversation_quota = models.PositiveIntegerField(default=100)
 
+    memory_enabled = models.BooleanField(default=True)
+    memory_max_messages = models.PositiveSmallIntegerField(default=20)
+    memory_summary_max_chars = models.PositiveIntegerField(default=1500)
+
     system_prompt_overrides = models.JSONField(default=dict)
     language_defaults = models.JSONField(default=list)
 

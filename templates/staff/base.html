@@ -1,0 +1,310 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Staff Portal{% endblock %} | AI WhatsApp Assistant</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'staff/staff.css' %}">
+</head>
+
+<body class="min-h-screen">
+
+{% if request.user.is_authenticated %}
+<div class="staff-layout min-h-screen" data-staff-layout>
+
+    <div class="staff-overlay" data-sidebar-overlay aria-hidden="true"></div>
+
+    <aside id="staff-sidebar"
+           class="staff-sidebar staff-sidebar-responsive"
+           aria-label="Workspace sidebar"
+           data-sidebar>
+
+        <div class="mb-8 flex items-center justify-between gap-3">
+            <a href="{% url 'dashboard' %}" class="staff-brand flex min-w-0 items-center gap-3">
+            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#d8e5d8] text-sm font-extrabold text-[#102b24]">
+                WA
+            </span>
+            <span class="staff-sidebar-label text-base font-extrabold leading-tight text-white">
+                AI WhatsApp<br>Assistant
+            </span>
+            </a>
+
+            <button type="button"
+                    class="staff-mobile-close"
+                    data-sidebar-close
+                    aria-label="Close navigation">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"
+                     viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <p class="staff-sidebar-label mb-4 text-xs font-bold uppercase tracking-widest text-[#93b4a2]">
+            Workspace
+        </p>
+
+        <nav aria-label="Staff navigation" class="staff-sidebar-nav">
+
+            <a href="{% url 'dashboard' %}" class="staff-nav-link" title="Dashboard"
+               {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}>
+                <svg class="staff-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+                </svg>
+                <span class="staff-sidebar-label">Dashboard</span>
+            </a>
+
+            <a href="{% url 'conversation-list' %}" class="staff-nav-link" title="Conversations"
+               {% if request.resolver_match.url_name == 'conversation-list' or request.resolver_match.url_name == 'conversation-detail' %}aria-current="page"{% endif %}>
+                <svg class="staff-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5Z"/>
+                    <path d="M8 10h9M8 14h6"/>
+                </svg>
+                <span class="staff-sidebar-label">Conversations</span>
+            </a>
+
+            <a href="{% url 'booking-list' %}" class="staff-nav-link" title="Bookings"
+               {% if request.resolver_match.url_name == 'booking-list' %}aria-current="page"{% endif %}>
+                <svg class="staff-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                    <path d="M7 3v4M17 3v4M3 10h18"/>
+                </svg>
+                <span class="staff-sidebar-label">Bookings</span>
+            </a>
+
+            <a href="{% url 'staff-integrations' %}" class="staff-nav-link" title="Integrations"
+               {% if request.resolver_match.url_name == 'staff-integrations' %}aria-current="page"{% endif %}>
+                <svg class="staff-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>
+                    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
+                </svg>
+                <span class="staff-sidebar-label">Integrations</span>
+            </a>
+
+        </nav>
+
+        <div class="staff-sidebar-footer mt-8 border-t border-white/15 pt-6">
+            <p class="staff-sidebar-label mb-4 truncate text-sm font-semibold text-white">
+                {{ request.user.username }}
+            </p>
+
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="staff-nav-link w-full text-left" title="Log out">
+                    <svg class="staff-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <path d="m16 17 5-5-5-5M21 12H9"/>
+                    </svg>
+                    <span class="staff-sidebar-label">Log out</span>
+                </button>
+            </form>
+        </div>
+
+    </aside>
+
+    <div class="staff-main min-w-0">
+
+        <header class="border-b border-[#e5e9e3] bg-white/90 px-5 py-4 sm:px-8 lg:px-10">
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-3">
+                    <button type="button"
+                            class="staff-menu-button"
+                            data-sidebar-toggle
+                            aria-controls="staff-sidebar"
+                            aria-expanded="false"
+                            aria-label="Open navigation">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor"
+                             stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 7h16M4 12h16M4 17h16"/>
+                        </svg>
+                    </button>
+                    <span class="text-xs font-bold uppercase tracking-widest text-[#547263]">
+                        Staff Portal
+                    </span>
+                </div>
+                <span class="rounded-full bg-[#eaf1e9] px-4 py-2 text-xs font-bold text-[#173d32]">
+                    {{ request.user.username }}
+                </span>
+            </div>
+        </header>
+
+        <main id="main-content" class="mx-auto w-full max-w-7xl px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+</div>
+
+{% else %}
+
+<main id="main-content" class="mx-auto w-full max-w-7xl px-5 py-10 sm:px-8">
+    {% block guest_content %}{% endblock %}
+</main>
+
+{% endif %}
+
+<script>
+(function () {
+    "use strict";
+
+    const layout = document.querySelector("[data-staff-layout]");
+    if (!layout) return;
+
+    const sidebar = layout.querySelector("[data-sidebar]");
+    const toggle = layout.querySelector("[data-sidebar-toggle]");
+    const closeButton = layout.querySelector("[data-sidebar-close]");
+    const overlay = layout.querySelector("[data-sidebar-overlay]");
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const storageKey = "staff-sidebar-collapsed";
+
+    let drawerOpen = false;
+    let lastFocused = null;
+
+    function getStoredCollapse() {
+        try {
+            return window.localStorage.getItem(storageKey) === "true";
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function storeCollapse(value) {
+        try {
+            window.localStorage.setItem(storageKey, String(value));
+        } catch (_) {
+            // Storage may be disabled by browser settings.
+        }
+    }
+
+    function updateControls() {
+        const desktop = desktopQuery.matches;
+        const expanded = desktop
+            ? !layout.classList.contains("staff-collapsed")
+            : drawerOpen;
+
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.setAttribute(
+            "aria-label",
+            desktop
+                ? (expanded ? "Collapse navigation" : "Expand navigation")
+                : (expanded ? "Close navigation" : "Open navigation")
+        );
+
+        sidebar.setAttribute(
+            "aria-hidden",
+            String(!desktop && !drawerOpen)
+        );
+
+        if ("inert" in sidebar) {
+            sidebar.inert = !desktop && !drawerOpen;
+        }
+
+        document.body.classList.toggle(
+            "staff-drawer-lock",
+            !desktop && drawerOpen
+        );
+    }
+
+    function closeDrawer(restoreFocus) {
+        drawerOpen = false;
+        layout.classList.remove("staff-drawer-open");
+        updateControls();
+
+        if (restoreFocus && lastFocused) {
+            lastFocused.focus();
+        }
+    }
+
+    function openDrawer() {
+        lastFocused = document.activeElement;
+        drawerOpen = true;
+        layout.classList.add("staff-drawer-open");
+        updateControls();
+        closeButton.focus();
+    }
+
+    function syncViewport() {
+        if (desktopQuery.matches) {
+            drawerOpen = false;
+            layout.classList.remove("staff-drawer-open");
+            layout.classList.toggle("staff-collapsed", getStoredCollapse());
+        } else {
+            layout.classList.remove("staff-collapsed");
+        }
+        updateControls();
+    }
+
+    toggle.addEventListener("click", function () {
+        if (desktopQuery.matches) {
+            const collapsed = !layout.classList.contains("staff-collapsed");
+            layout.classList.toggle("staff-collapsed", collapsed);
+            storeCollapse(collapsed);
+            updateControls();
+        } else if (drawerOpen) {
+            closeDrawer(true);
+        } else {
+            openDrawer();
+        }
+    });
+
+    closeButton.addEventListener("click", function () {
+        closeDrawer(true);
+    });
+
+    overlay.addEventListener("click", function () {
+        closeDrawer(true);
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (!drawerOpen || desktopQuery.matches) return;
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeDrawer(true);
+            return;
+        }
+
+        if (event.key !== "Tab") return;
+
+        const focusable = Array.from(
+            sidebar.querySelectorAll(
+                'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter(function (element) {
+            return element.getClientRects().length > 0;
+        });
+
+        if (!focusable.length) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    if (desktopQuery.addEventListener) {
+        desktopQuery.addEventListener("change", syncViewport);
+    } else {
+        desktopQuery.addListener(syncViewport);
+    }
+
+    syncViewport();
+})();
+</script>
+
+</body>
+</html>

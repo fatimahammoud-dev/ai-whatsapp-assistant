@@ -3,6 +3,7 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from conversations.models import Message
+from integrations.retry import retry_call
 from integrations.transcription import (
     TranscriptionError,
     get_transcription_provider,
@@ -33,9 +34,14 @@ def transcribe_audio_message(message, tenant):
 
         provider = get_transcription_provider()
 
-        transcript = provider.transcribe(
-            audio_bytes=audio_bytes,
-            mime_type=mime_type,
+        transcript = retry_call(
+            lambda: provider.transcribe(
+                audio_bytes=audio_bytes,
+                mime_type=mime_type,
+            ),
+            should_retry=lambda exc: isinstance(exc, TranscriptionError)
+            and getattr(exc, "retryable", False),
+            operation_name="audio_transcription",
         )
 
     except (

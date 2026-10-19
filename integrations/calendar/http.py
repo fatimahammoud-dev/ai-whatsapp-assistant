@@ -1,10 +1,16 @@
 """Small JSON HTTP helper for calendar providers."""
 
 import json
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from integrations.calendar.base import CalendarProviderError
+from integrations.retry import retry_call
+
+
+class RetryableCalendarError(CalendarProviderError):
+    """Transient calendar HTTP failure."""
 
 
 def request_json(
@@ -15,6 +21,7 @@ def request_json(
     payload=None,
     form=None,
     headers=None,
+    retry_safe=False,
 ):
     """Perform one HTTP request and decode its JSON response."""
     request_headers = {
@@ -41,11 +48,27 @@ def request_json(
         method=method,
     )
 
-    try:
-        with urlopen(request, timeout=15) as response:
-            body = response.read()
-    except OSError as exc:
-        raise CalendarProviderError("External calendar request failed.") from exc
+    def send_request():
+        try:
+            with urlopen(request, timeout=15) as response:
+                return response.read()
+        except HTTPError as exc:
+            if exc.code == 429 or 500 <= exc.code <= 599:
+                raise RetryableCalendarError(
+                    "Temporary calendar HTTP failure."
+                ) from exc
+            raise CalendarProviderError("Calendar request rejected.") from exc
+        except (URLError, TimeoutError, ConnectionError) as exc:
+            raise RetryableCalendarError(
+                "Temporary calendar connection failure."
+            ) from exc
+
+    body = retry_call(
+        send_request,
+        should_retry=lambda exc: isinstance(exc, RetryableCalendarError),
+        attempts=3 if method.upper() == "GET" or retry_safe else 1,
+        operation_name="calendar_http",
+    )
 
     if not body:
         return {}

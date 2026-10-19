@@ -1,37 +1,191 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard</title>
-</head>
-<body>
-    <h1>Dashboard</h1>
+{% extends "staff/base.html" %}
 
-    <p>Welcome, {{ request.user.username }}.</p>
+{% block title %}Dashboard{% endblock %}
 
-    <h2>Upcoming bookings</h2>
+{% block content %}
 
-    <ul>
-        {% for booking in upcoming_bookings %}
-            <li>
-                {{ booking.end_user }}
-                —
-                {% if booking.service %}
-                    {{ booking.service.name }}
-                {% else %}
-                    No service
-                {% endif %}
-                —
-                {{ booking.scheduled_start|date:"Y-m-d H:i" }}
+<div class="mb-9 flex flex-wrap items-end justify-between gap-5">
+    <div>
+        <p class="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-[#527a65]">
+            WORKSPACE OVERVIEW
+        </p>
+        <h1 class="text-3xl font-extrabold tracking-tight text-[#242b29] sm:text-4xl">
+            Good to see you, {{ request.user.username }}.
+        </h1>
+        <p class="mt-3 max-w-2xl text-sm leading-7 text-[#66746b]">
+            Your workspace for managing customer conversations,
+            appointments, and calendar connections.
+        </p>
+    </div>
+
+    <span class="inline-flex items-center gap-2 rounded-full border border-[#d7e6d8] bg-[#eaf2e9] px-4 py-2 text-xs font-bold text-[#24513d]">
+        <span class="h-2 w-2 rounded-full bg-[#3d9067]"></span>
+        Staff workspace
+    </span>
+</div>
+
+<div class="mb-8 grid gap-5 md:grid-cols-3">
+
+    <a href="{% url 'conversation-list' %}" class="staff-card group block p-6 transition hover:-translate-y-1 hover:shadow-lg">
+        <div class="mb-7 flex items-start justify-between">
+            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e7efe8] text-[#24513d]">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5Z"/>
+                    <path d="M8 10h9M8 14h6"/>
+                </svg>
+            </span>
+            <span class="text-lg text-[#789384] transition group-hover:translate-x-1"><svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+        <h2 class="text-xl font-extrabold text-[#242b29]">Conversations</h2>
+        <p class="mt-3 min-h-14 text-sm leading-6 text-[#66746b]">
+            Read customer messages and follow the conversation history.
+        </p>
+        <div class="mt-6 border-t border-[#edf0eb] pt-5">
+            <span class="text-sm font-bold text-[#24513d]">Open inbox <svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+    </a>
+
+    <a href="{% url 'booking-list' %}" class="staff-card group block p-6 transition hover:-translate-y-1 hover:shadow-lg">
+        <div class="mb-7 flex items-start justify-between">
+            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f1eee2] text-[#746542]">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="5" width="18" height="16" rx="2"/>
+                    <path d="M7 3v4M17 3v4M3 10h18"/>
+                </svg>
+            </span>
+            <span class="text-lg text-[#789384] transition group-hover:translate-x-1"><svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+        <h2 class="text-xl font-extrabold text-[#242b29]">Bookings</h2>
+        <p class="mt-3 min-h-14 text-sm leading-6 text-[#66746b]">
+            Review appointment records and check their current status.
+        </p>
+        <div class="mt-6 border-t border-[#edf0eb] pt-5">
+            <span class="text-sm font-bold text-[#24513d]">View bookings <svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+    </a>
+
+    <a href="{% url 'staff-integrations' %}" class="staff-card group block p-6 transition hover:-translate-y-1 hover:shadow-lg">
+        <div class="mb-7 flex items-start justify-between">
+            <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e9e9f0] text-[#555d77]">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/>
+                    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>
+                </svg>
+            </span>
+            <span class="text-lg text-[#789384] transition group-hover:translate-x-1"><svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+        <h2 class="text-xl font-extrabold text-[#242b29]">Integrations</h2>
+        <p class="mt-3 min-h-14 text-sm leading-6 text-[#66746b]">
+            Check the connection status of Google Calendar and Outlook.
+        </p>
+        <div class="mt-6 border-t border-[#edf0eb] pt-5">
+            <span class="text-sm font-bold text-[#24513d]">Manage connections <svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </div>
+    </a>
+
+</div>
+
+<div class="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
+
+    <section aria-labelledby="upcoming-heading" class="staff-card overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[#edf0eb] px-6 py-6">
+            <div>
+                <h2 id="upcoming-heading" class="text-lg font-extrabold text-[#242b29]">
+                    Upcoming bookings
+                </h2>
+                <p class="mt-2 text-sm text-[#66746b]">
+                    Confirmed appointments scheduled for your business.
+                </p>
+            </div>
+            <a href="{% url 'booking-list' %}" class="text-sm font-bold text-[#24513d] hover:underline">
+                View all <svg class="inline-block h-4 w-4 align-middle" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14m-6-6 6 6-6 6"/></svg>
+            </a>
+        </div>
+
+        <div class="divide-y divide-[#edf0eb]">
+            {% for booking in upcoming_bookings %}
+                <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+                    <div class="flex items-center gap-4">
+                        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eaf2e9] font-extrabold text-[#24513d]">
+                            {{ forloop.counter }}
+                        </span>
+                        <div>
+                            <p class="font-bold text-[#242b29]">{{ booking.end_user }}</p>
+                            <p class="mt-1 text-sm text-[#66746b]">
+                                {% if booking.service %}
+                                    {{ booking.service.name }}
+                                {% else %}
+                                    Service not specified
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <time class="rounded-xl bg-[#f4f6f2] px-4 py-2 text-sm font-semibold text-[#395645]">
+                        {{ booking.scheduled_start|date:"Y-m-d H:i" }}
+                    </time>
+                </div>
+            {% empty %}
+                <div class="px-6 py-14 text-center">
+                    <span class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eaf2e9] text-[#24513d]">
+                        <svg class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="3" y="5" width="18" height="16" rx="2"/>
+                            <path d="M7 3v4M17 3v4M3 10h18M8 15l2.5 2.5L16 12"/>
+                        </svg>
+                    </span>
+                    <h3 class="text-base font-extrabold text-[#242b29]">No upcoming bookings</h3>
+                    <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#66746b]">
+                        Your confirmed upcoming appointments will appear here automatically.
+                    </p>
+                    <a href="{% url 'booking-list' %}" class="mt-5 inline-flex rounded-xl border border-[#d9e5d9] px-5 py-3 text-sm font-bold text-[#24513d] hover:bg-[#eaf2e9]">
+                        View booking history
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <aside class="staff-card p-6">
+        <p class="mb-3 text-xs font-extrabold uppercase tracking-[0.15em] text-[#527a65]">
+            QUICK GUIDE
+        </p>
+        <h2 class="text-xl font-extrabold text-[#242b29]">
+            How to use your workspace
+        </h2>
+        <p class="mt-3 text-sm leading-6 text-[#66746b]">
+            Everything you need to review customer activity in one place.
+        </p>
+
+        <ol class="mt-7 space-y-6">
+            <li class="flex gap-4">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eaf2e9] text-sm font-extrabold text-[#24513d]">01</span>
+                <div>
+                    <p class="font-bold text-[#242b29]">Review conversations</p>
+                    <p class="mt-1 text-sm leading-6 text-[#66746b]">
+                        Open the inbox to read customer messages.
+                    </p>
+                </div>
             </li>
-        {% empty %}
-            <li>No upcoming bookings.</li>
-        {% endfor %}
-    </ul>
+            <li class="flex gap-4">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eaf2e9] text-sm font-extrabold text-[#24513d]">02</span>
+                <div>
+                    <p class="font-bold text-[#242b29]">Check bookings</p>
+                    <p class="mt-1 text-sm leading-6 text-[#66746b]">
+                        View appointments and their current status.
+                    </p>
+                </div>
+            </li>
+            <li class="flex gap-4">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eaf2e9] text-sm font-extrabold text-[#24513d]">03</span>
+                <div>
+                    <p class="font-bold text-[#242b29]">Review integrations</p>
+                    <p class="mt-1 text-sm leading-6 text-[#66746b]">
+                        See whether a calendar account is connected.
+                    </p>
+                </div>
+            </li>
+        </ol>
+    </aside>
 
-    <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit">Log out</button>
-    </form>
-</body>
-</html>
+</div>
+
+{% endblock %}

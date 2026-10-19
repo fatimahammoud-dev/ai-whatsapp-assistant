@@ -34,6 +34,7 @@ class ConversationAdmin(admin.ModelAdmin):
         "assigned_staff",
         "started_at",
         "last_message_at",
+        "memory_last_summarized_message_id",
     )
     list_filter = (
         "status",

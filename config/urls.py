@@ -1,4 +1,4 @@
-"""
+﻿"""
 URL configuration for config project.
 """
 
@@ -7,12 +7,31 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from accounts.views import dashboard_home
+from accounts.views import dashboard_home, staff_integrations
 from bookings.views import BookingListView
 from core.views import healthcheck
+from integrations.calendar.oauth_views import (
+    calendar_oauth_callback,
+    calendar_oauth_connect,
+)
 from integrations.views import whatsapp_webhook
 
 urlpatterns = [
+    path(
+        "integrations/calendar/<str:provider>/connect/",
+        calendar_oauth_connect,
+        name="calendar-oauth-connect",
+    ),
+    path(
+        "integrations/calendar/<str:provider>/callback/",
+        calendar_oauth_callback,
+        name="calendar-oauth-callback",
+    ),
+    path(
+        "integrations/",
+        staff_integrations,
+        name="staff-integrations",
+    ),
     path(
         "",
         RedirectView.as_view(pattern_name="dashboard", permanent=False),

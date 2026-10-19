@@ -1,4 +1,4 @@
-﻿"""Microsoft Outlook / Graph calendar provider."""
+"""Microsoft Outlook / Graph calendar provider."""
 
 from datetime import UTC
 from urllib.parse import quote, urlencode
@@ -90,28 +90,39 @@ class OutlookCalendarProvider(CalendarProvider):
 
         return intervals
 
-    def create_event(self, connection, slot, summary) -> str:
+    def create_event(self, connection, slot, summary, *, idempotency_key=None) -> str:
         token = self.access_token(connection)
         calendar_id = quote(connection.external_calendar_id, safe="")
 
         start = slot.start.astimezone(UTC)
         end = slot.end.astimezone(UTC)
 
+        event_payload = {
+            "subject": summary,
+            "start": {
+                "dateTime": start.replace(tzinfo=None).isoformat(),
+                "timeZone": "UTC",
+            },
+            "end": {
+                "dateTime": end.replace(tzinfo=None).isoformat(),
+                "timeZone": "UTC",
+            },
+        }
+
+        if idempotency_key is not None:
+            event_payload["transactionId"] = str(idempotency_key)
+
+        request_kwargs = {
+            "method": "POST",
+            "access_token": token,
+            "payload": event_payload,
+        }
+        if idempotency_key is not None:
+            request_kwargs["retry_safe"] = True
+
         payload = request_json(
             f"{GRAPH_BASE_URL}/me/calendars/{calendar_id}/events",
-            method="POST",
-            access_token=token,
-            payload={
-                "subject": summary,
-                "start": {
-                    "dateTime": start.replace(tzinfo=None).isoformat(),
-                    "timeZone": "UTC",
-                },
-                "end": {
-                    "dateTime": end.replace(tzinfo=None).isoformat(),
-                    "timeZone": "UTC",
-                },
-            },
+            **request_kwargs,
         )
 
         event_id = payload.get("id")

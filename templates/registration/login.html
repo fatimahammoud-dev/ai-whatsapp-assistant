@@ -1,25 +1,112 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Staff Login</title>
-</head>
-<body>
-    <h1>Staff Login</h1>
+{% extends "staff/base.html" %}
 
-    {% if form.errors %}
-        <p>Invalid username or password.</p>
-    {% endif %}
+{% block title %}Staff Login{% endblock %}
 
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
+{% block guest_content %}
 
-        {% if next %}
-            <input type="hidden" name="next" value="{{ next }}">
+<div class="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-[#dce5da] bg-white shadow-xl sm:rounded-[1.75rem] lg:grid lg:grid-cols-2">
+
+    <!-- BRANDING SECTION -->
+    <section class="flex flex-col justify-between bg-[#102b24] px-6 py-8 text-white sm:px-10 sm:py-10 lg:min-h-[530px] lg:p-12">
+
+        <div>
+            <!-- LOGO -->
+            <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#d8e5d8] text-sm font-extrabold text-[#102b24] lg:h-14 lg:w-14">
+                WA
+            </span>
+
+            <!-- BRAND -->
+            <p class="mt-7 text-xs font-extrabold uppercase tracking-[0.2em] text-[#b2d0bd] lg:mt-12">
+                AI WHATSAPP ASSISTANT
+            </p>
+
+            <!-- HEADING -->
+            <h1 class="mt-5 max-w-md text-2xl font-extrabold leading-tight sm:text-3xl lg:mt-6 lg:text-4xl">
+                A smarter way to manage your workspace.
+            </h1>
+
+            <!-- DESCRIPTION -->
+            <p class="mt-4 max-w-md text-sm leading-7 text-[#d3e5d9] lg:mt-6">
+                Keep customer conversations, appointment records,
+                and calendar connections organized in one place.
+            </p>
+        </div>
+
+        <!-- DESKTOP FOOTER -->
+        <p class="mt-7 hidden text-xs text-[#b2d0bd] lg:block">
+            Staff Portal
+        </p>
+
+    </section>
+
+    <!-- LOGIN FORM SECTION -->
+    <section class="px-6 py-9 sm:px-12 sm:py-12 lg:py-16">
+
+        <p class="text-xs font-extrabold uppercase tracking-[0.18em] text-[#527a65]">
+            SECURE STAFF ACCESS
+        </p>
+
+        <h2 class="mt-4 text-3xl font-extrabold tracking-tight text-[#242b29]">
+            Welcome back
+        </h2>
+
+        <p class="mt-3 text-sm leading-7 text-[#66746b]">
+            Sign in to your staff dashboard.
+        </p>
+
+        <!-- LOGIN ERRORS -->
+        {% if form.errors %}
+        <div role="alert"
+             class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+            Please check your username and password.
+        </div>
         {% endif %}
 
-        <button type="submit">Log in</button>
-    </form>
-</body>
-</html>
+        <!-- LOGIN FORM -->
+        <form method="post" class="mt-8 space-y-6">
+
+            {% csrf_token %}
+
+            <!-- USERNAME -->
+            <div class="staff-field">
+                <label for="{{ form.username.id_for_label }}"
+                       class="mb-2 block text-sm font-bold text-[#395645]">
+                    Username
+                </label>
+
+                {{ form.username }}
+            </div>
+
+            <!-- PASSWORD -->
+            <div class="staff-field">
+                <label for="{{ form.password.id_for_label }}"
+                       class="mb-2 block text-sm font-bold text-[#395645]">
+                    Password
+                </label>
+
+                {{ form.password }}
+            </div>
+
+            <!-- REDIRECT AFTER LOGIN -->
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
+
+            <!-- SIGN IN BUTTON -->
+            <button type="submit"
+                    class="staff-button w-full py-3.5">
+                Sign in to workspace
+            </button>
+
+        </form>
+
+        <!-- SECURITY NOTE -->
+        <p class="mt-7 text-center text-xs leading-6 text-[#7a877e]">
+            Access is restricted to authorized staff accounts.
+        </p>
+
+    </section>
+
+</div>
+
+{% endblock %}
