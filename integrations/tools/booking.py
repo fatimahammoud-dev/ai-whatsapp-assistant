@@ -11,6 +11,9 @@ class BookingSlotUnavailableError(Exception):
 
 def create_booking(tenant, end_user, slot, service) -> Booking:
     """Create and return a confirmed booking for the requested slot."""
+    if slot.end <= slot.start:
+        raise ValueError("A booking slot must end after it starts.")
+
     try:
         with transaction.atomic():
             return Booking.objects.create(

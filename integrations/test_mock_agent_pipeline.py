@@ -7,11 +7,23 @@ from integrations.tasks import process_buffered_messages
 
 def _fake_conversation():
     return SimpleNamespace(
+        pk=303,
+        tenant_id=101,
+        end_user_id=202,
+        status="active",
         tenant=SimpleNamespace(pk=101),
         end_user=SimpleNamespace(
             pk=202,
             phone_number="96170123456",
         ),
+    )
+
+
+def _message(conversation, content):
+    return SimpleNamespace(
+        content=content,
+        conversation=conversation,
+        conversation_id=conversation.pk,
     )
 
 
@@ -54,7 +66,10 @@ def test_process_buffered_messages_sends_plain_agent_reply(monkeypatch):
     process_buffered_messages(
         tenant_id=101,
         end_user_id=202,
-        concatenated_messages="Hello\nHow are you?",
+        messages=[
+            _message(conversation, "Hello"),
+            _message(conversation, "How are you?"),
+        ],
     )
 
     respond_mock.assert_called_once()
@@ -97,7 +112,7 @@ def test_process_buffered_messages_recognizes_tool_call(monkeypatch):
     process_buffered_messages(
         tenant_id=101,
         end_user_id=202,
-        concatenated_messages="I want to book an appointment",
+        messages=[_message(conversation, "I want to book an appointment")],
     )
 
     respond_mock.assert_called_once()
@@ -131,8 +146,46 @@ def test_process_buffered_messages_stops_without_active_conversation(
     process_buffered_messages(
         tenant_id=101,
         end_user_id=202,
-        concatenated_messages="Hello",
+        messages=[],
     )
 
     respond_mock.assert_not_called()
     send_mock.assert_not_called()
+
+
+def test_multiline_message_preserves_original_object(monkeypatch):
+    conversation = _fake_conversation()
+    _mock_conversation_query(monkeypatch, conversation)
+
+    original = SimpleNamespace(
+        content="Hello\nI need an appointment",
+        pk=777,
+        message_type="text",
+        conversation=conversation,
+        conversation_id=conversation.pk,
+    )
+
+    respond_mock = Mock(return_value=AgentResponse(action="reply", text="Hello"))
+    send_mock = Mock()
+
+    monkeypatch.setattr(
+        "integrations.tasks.MockAgent.respond",
+        respond_mock,
+    )
+    monkeypatch.setattr(
+        "integrations.tasks.send_text_message",
+        send_mock,
+    )
+
+    process_buffered_messages(
+        tenant_id=101,
+        end_user_id=202,
+        messages=[original],
+    )
+
+    actual_messages = respond_mock.call_args.kwargs["messages"]
+    assert len(actual_messages) == 1
+    assert actual_messages[0] is original
+    assert actual_messages[0].content == "Hello\nI need an appointment"
+    assert actual_messages[0].pk == 777
+    send_mock.assert_called_once_with(conversation, "Hello")

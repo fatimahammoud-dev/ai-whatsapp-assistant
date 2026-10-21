@@ -31,7 +31,7 @@ def test_booking_message_runs_full_mock_agent_pipeline_without_network():
         status=Conversation.Status.ACTIVE,
     )
 
-    Message.objects.create(
+    inbound = Message.objects.create(
         conversation=conversation,
         direction=Message.Direction.INBOUND,
         message_type=Message.MessageType.TEXT,
@@ -68,7 +68,7 @@ def test_booking_message_runs_full_mock_agent_pipeline_without_network():
         process_buffered_messages(
             tenant_id=tenant.pk,
             end_user_id=end_user.pk,
-            concatenated_messages="I want to book an appointment",
+            messages=[inbound],
         )
 
     availability_mock.assert_called_once_with(
@@ -86,3 +86,62 @@ def test_booking_message_runs_full_mock_agent_pipeline_without_network():
     assert "Available appointment times:" in outbound.content
     assert "2026-01-15 09:00" in outbound.content
     assert "2026-01-15 11:00" in outbound.content
+
+
+@pytest.mark.django_db
+def test_outbound_stays_in_original_conversation_with_two_active_conversations():
+    tenant = Tenant.objects.create(
+        business_name="Conversation Routing Test",
+        vertical=Tenant.Vertical.DOCTOR,
+        phone_number_id="routing-test-phone-id",
+        whatsapp_access_token=b"routing-test-token",
+    )
+    end_user = EndUser.objects.create(
+        tenant=tenant,
+        phone_number=RECIPIENT,
+    )
+    original = Conversation.objects.create(
+        tenant=tenant,
+        end_user=end_user,
+        status=Conversation.Status.ACTIVE,
+    )
+    newer = Conversation.objects.create(
+        tenant=tenant,
+        end_user=end_user,
+        status=Conversation.Status.ACTIVE,
+    )
+    inbound = Message.objects.create(
+        conversation=original,
+        direction=Message.Direction.INBOUND,
+        message_type=Message.MessageType.TEXT,
+        content="Hello",
+        whatsapp_message_id="wamid.routing-inbound",
+    )
+
+    with patch("integrations.whatsapp.urlopen") as urlopen_mock:
+        response = urlopen_mock.return_value
+        response.__enter__.return_value.getcode.return_value = 200
+        response.__enter__.return_value.read.return_value = (
+            b'{"messages":[{"id":"wamid.routing-outbound"}]}'
+        )
+
+        process_buffered_messages(
+            tenant_id=tenant.pk,
+            end_user_id=end_user.pk,
+            messages=[inbound],
+        )
+
+    urlopen_mock.assert_called_once()
+
+    assert (
+        Message.objects.filter(
+            conversation=original,
+            direction=Message.Direction.OUTBOUND,
+        ).count()
+        == 1
+    )
+
+    assert not Message.objects.filter(
+        conversation=newer,
+        direction=Message.Direction.OUTBOUND,
+    ).exists()
