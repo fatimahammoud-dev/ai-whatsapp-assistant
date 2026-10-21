@@ -123,11 +123,13 @@ def test_three_rapid_messages_trigger_processing_once(
     for args, _ in scheduled_tasks:
         debounce_buffer_task.run(*args)
 
-    process_mock.assert_called_once_with(
-        TENANT_ID,
-        END_USER_ID,
-        "First message\nSecond message\nThird message",
-    )
+    process_mock.assert_called_once()
+    batch = process_mock.call_args.args[2]
+    assert [message.content for message in batch] == [
+        "First message",
+        "Second message",
+        "Third message",
+    ]
 
 
 def test_messages_after_debounce_window_process_separately(
@@ -185,13 +187,13 @@ def test_messages_after_debounce_window_process_separately(
     assert process_mock.call_args_list[0].args == (
         TENANT_ID,
         END_USER_ID,
-        "First batch",
+        [SimpleNamespace(content="First batch")],
     )
 
     assert process_mock.call_args_list[1].args == (
         TENANT_ID,
         END_USER_ID,
-        "Second batch",
+        [SimpleNamespace(content="Second batch")],
     )
 
 
@@ -246,7 +248,7 @@ def test_buffer_is_cleared_after_processing(
     process_mock.assert_called_once_with(
         TENANT_ID,
         END_USER_ID,
-        "Message to drain",
+        [SimpleNamespace(content="Message to drain")],
     )
 
 
@@ -310,8 +312,8 @@ def test_near_simultaneous_messages_are_not_dropped_or_duplicated(
 
     assert process_mock.call_count == 1
 
-    processed_text = process_mock.call_args.args[2]
-    processed_messages = processed_text.split("\n")
+    batch = process_mock.call_args.args[2]
+    processed_messages = [message.content for message in batch]
 
     assert sorted(processed_messages) == sorted(
         ["Concurrent message A", "Concurrent message B"]
@@ -338,3 +340,47 @@ def test_buffer_keys_have_expiration(monkeypatch, redis_client):
     ):
         ttl = redis_client.ttl(key)
         assert 0 < ttl <= BUFFER_TTL_SECONDS
+
+
+def test_debounce_preserves_original_message_objects(
+    monkeypatch,
+    redis_client,
+):
+    original = SimpleNamespace(
+        pk=1099,
+        content="Hello\nI need an appointment",
+        message_type="text",
+        conversation_id=501,
+    )
+
+    monkeypatch.setattr(
+        "integrations.tasks.Message.objects.in_bulk",
+        lambda ids: {1099: original},
+    )
+
+    scheduled = []
+    monkeypatch.setattr(
+        debounce_buffer_task,
+        "apply_async",
+        lambda *, args, countdown: scheduled.append(args),
+    )
+
+    process_mock = Mock()
+    monkeypatch.setattr(
+        "integrations.tasks.process_buffered_messages",
+        process_mock,
+    )
+
+    buffer_inbound_message(TENANT_ID, END_USER_ID, 1099)
+
+    assert len(scheduled) == 1
+    debounce_buffer_task.run(*scheduled[0])
+
+    process_mock.assert_called_once()
+    batch = process_mock.call_args.args[2]
+
+    assert len(batch) == 1
+    assert batch[0] is original
+    assert batch[0].pk == 1099
+    assert batch[0].conversation_id == 501
+    assert batch[0].content == "Hello\nI need an appointment"
